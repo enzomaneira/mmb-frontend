@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Brinquedos da Mãe — Frontend
 
 Interface em React + Tailwind para o sistema de gestão de vendas.
@@ -39,3 +40,4 @@ npm run build
 ```
 
 Os arquivos estáticos ficam em `dist/`.
+=======
