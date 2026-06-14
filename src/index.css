@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-brand-cream font-sans text-gray-800 antialiased;
+  }
+}
+
+@layer components {
+  .page-title {
+    @apply font-display text-2xl font-bold text-brand-pink-deep;
+  }
+
+  .section-card {
+    @apply rounded-2xl border border-brand-pink/40 bg-white p-6 shadow-card;
+  }
+}
