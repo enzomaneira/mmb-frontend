@@ -11,4 +11,4 @@ WORKDIR /app
 RUN npm install -g serve
 COPY --from=build /app/dist /app/dist
 EXPOSE 3000
-CMD ["sh", "-c", "serve -s dist -l $PORT"]
+CMD ["sh", "-c", "serve -s dist -l $PORT"] # porta 3000
