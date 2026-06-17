@@ -11,6 +11,7 @@ import { Select } from "../../components/ui/Select";
 interface OrderItemForm {
   product_id: string;
   quantity: string;
+  unit_price: string;
 }
 
 export function RegisterOrder() {
@@ -22,7 +23,7 @@ export function RegisterOrder() {
   const [customerId, setCustomerId] = useState("");
   const [status, setStatus] = useState<OrderStatus>("PENDING");
   const [items, setItems] = useState<OrderItemForm[]>([
-    { product_id: "", quantity: "1" },
+    { product_id: "", quantity: "1", unit_price: "" },
   ]);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -35,6 +36,7 @@ export function RegisterOrder() {
         items: items.map((i) => ({
           product_id: Number(i.product_id),
           quantity: Number(i.quantity),
+          unit_price: i.unit_price !== "" ? Number(i.unit_price) : undefined,
         })),
       }),
     onSuccess: () => {
@@ -43,7 +45,7 @@ export function RegisterOrder() {
       setNumber("");
       setCustomerId("");
       setStatus("PENDING");
-      setItems([{ product_id: "", quantity: "1" }]);
+      setItems([{ product_id: "", quantity: "1", unit_price: "" }]);
     },
     onError: (err: Error) => {
       setMessage({ type: "error", text: err.message });
@@ -51,9 +53,8 @@ export function RegisterOrder() {
   });
 
   const estimatedTotal = items.reduce((sum, item) => {
-    const product = products.data?.find((p) => p.id === Number(item.product_id));
-    if (!product) return sum;
-    return sum + parseFloat(product.price) * Number(item.quantity || 0);
+    const price = item.unit_price !== "" ? parseFloat(item.unit_price) : parseFloat(products.data?.find((p) => p.id === Number(item.product_id))?.price ?? "0");
+    return sum + price * Number(item.quantity || 0);
   }, 0);
 
   const customerOptions = [
@@ -122,23 +123,38 @@ export function RegisterOrder() {
           <Button
             type="button"
             variant="secondary"
-            onClick={() => setItems([...items, { product_id: "", quantity: "1" }])}
+            onClick={() => setItems([...items, { product_id: "", quantity: "1", unit_price: "" }])}
           >
             + Adicionar item
           </Button>
         </div>
 
         {items.map((item, index) => (
-          <div key={index} className="grid gap-3 sm:grid-cols-[1fr_120px_auto]">
+          <div key={index} className="grid gap-3 sm:grid-cols-[1fr_120px_120px_auto]">
             <Select
               label={index === 0 ? "Produto" : undefined}
               value={item.product_id}
               onChange={(e) => {
                 const next = [...items];
                 next[index].product_id = e.target.value;
+                const product = products.data?.find((p) => p.id === Number(e.target.value));
+                next[index].unit_price = product ? String(product.price) : "";
                 setItems(next);
               }}
               options={productOptions}
+            />
+            <Input
+              label={index === 0 ? "Preço" : undefined}
+              type="number"
+              min={0}
+              step={0.01}
+              required
+              value={item.unit_price}
+              onChange={(e) => {
+                const next = [...items];
+                next[index].unit_price = e.target.value;
+                setItems(next);
+              }}
             />
             <Input
               label={index === 0 ? "Qtd" : undefined}

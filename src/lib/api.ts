@@ -189,7 +189,7 @@ export const api = {
       number: number;
       customer_id: number;
       status?: OrderStatus;
-      items: { product_id: number; quantity: number }[];
+      items: { product_id: number; quantity: number; unit_price?: number }[];
     }) =>
       request<Order>("/orders", {
         method: "POST",
