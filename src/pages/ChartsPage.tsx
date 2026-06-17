@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { type Dispatch, type SetStateAction, useState } from "react";
 import {
   Area, AreaChart,
   Bar, BarChart,
@@ -259,7 +259,19 @@ export function ChartsPage() {
     product_name: d.product_name, percentage: parseFloat(d.percentage), revenue: parseFloat(d.revenue),
   }));
 
-  const CHART_DEFS = [
+  const CHART_DEFS: {
+    id: string;
+    title: string;
+    type: ChartType;
+    setType: Dispatch<SetStateAction<ChartType>>;
+    data: Record<string, unknown>[];
+    dataKey: string;
+    nameKey: string;
+    disablePie: boolean;
+    disableRadar: boolean;
+    angleLabel: boolean;
+    formatter?: (v: number) => string;
+  }[] = [
     { id: "product-sales", title: "Vendas por produto (qtd.)", type: typeProductSales, setType: setTypeProductSales,
       data: productSalesData, dataKey: "quantity", nameKey: "date", disablePie: false, disableRadar: false, angleLabel: false },
     { id: "customer-sales", title: "Compras por cliente (R$)", type: typeCustomerSales, setType: setTypeCustomerSales,
@@ -272,7 +284,7 @@ export function ChartsPage() {
       data: totalData, dataKey: "value", nameKey: "date", disablePie: true, disableRadar: true, angleLabel: false, formatter: formatCurrency },
     { id: "monthly-revenue", title: "Receita mensal (R$)", type: typeMonthly, setType: setTypeMonthly,
       data: monthlyData, dataKey: "value", nameKey: "period", disablePie: true, disableRadar: true, angleLabel: false, formatter: formatCurrency },
-  ] as const;
+  ];
 
   const expandedDef = CHART_DEFS.find((c) => c.id === expandedChart);
 
