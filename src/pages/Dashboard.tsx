@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
@@ -8,6 +9,8 @@ import { api } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/format";
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, type OrderStatus } from "../types";
 import { StatusBadge } from "../components/ui/StatusBadge";
+
+const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
 const shortcuts = [
   { to: "/cadastro/clientes", label: "➕ Novo cliente", color: "bg-brand-pink text-white" },
@@ -58,11 +61,37 @@ export function Dashboard() {
     .sort((a, b) => a.stock_quantity - b.stock_quantity)
     .slice(0, 5);
 
-  // Monthly chart data
-  const chartData = (revenueChart.data ?? []).map((d) => ({
-    period: d.period,
-    value: parseFloat(d.value),
-  }));
+  // ── Gráfico de receita mensal ─────────────────────────────────────────────
+  // Extrai todos os anos disponíveis nos dados
+  const availableYears = useMemo(() => {
+    const years = new Set(
+      (revenueChart.data ?? []).map((d) => d.period.slice(0, 4))
+    );
+    return Array.from(years).sort().reverse(); // mais recente primeiro
+  }, [revenueChart.data]);
+
+  const [selectedYear, setSelectedYear] = useState<string>("all");
+
+  // Filtra e formata os dados do gráfico
+  const chartData = useMemo(() => {
+    const raw = revenueChart.data ?? [];
+    const filtered = selectedYear === "all"
+      ? raw
+      : raw.filter((d) => d.period.startsWith(selectedYear));
+
+    return filtered.map((d) => {
+      const [year, month] = d.period.split("-");
+      const monthName = MONTH_NAMES[parseInt(month) - 1];
+      const label = selectedYear === "all"
+        ? `${monthName}/${year.slice(2)}`  // "Jan/14"
+        : monthName;                        // "Jan"
+      return {
+        period: label,
+        periodRaw: d.period,
+        value: parseFloat(d.value),
+      };
+    });
+  }, [revenueChart.data, selectedYear]);
 
   // Top customers by spent
   const topCustomers = [...(customers.data ?? [])]
@@ -143,10 +172,24 @@ export function Dashboard() {
 
         {/* Revenue chart */}
         <div className="section-card">
-          <h3 className="mb-4 font-semibold text-brand-pink-deep">Receita mensal (R$)</h3>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h3 className="font-semibold text-brand-pink-deep">Receita mensal (R$)</h3>
+            {availableYears.length > 0 && (
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
+              >
+                <option value="all">Todos os anos</option>
+                {availableYears.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            )}
+          </div>
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={chartData}>
+              <AreaChart data={chartData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
                 <defs>
                   <linearGradient id="dash-grad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#D9468F" stopOpacity={0.25} />
@@ -154,10 +197,24 @@ export function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F8B4D9" />
-                <XAxis dataKey="period" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                <Area type="monotone" dataKey="value" stroke="#D9468F" fill="url(#dash-grad)" strokeWidth={2} />
+                <XAxis
+                  dataKey="period"
+                  tick={{ fontSize: 10 }}
+                  interval={selectedYear === "all" ? Math.max(0, Math.floor(chartData.length / 12) - 1) : 0}
+                  angle={selectedYear === "all" && chartData.length > 24 ? -35 : 0}
+                  textAnchor={selectedYear === "all" && chartData.length > 24 ? "end" : "middle"}
+                  height={selectedYear === "all" && chartData.length > 24 ? 42 : 24}
+                />
+                <YAxis
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(v) => v >= 1000 ? `R$${(v / 1000).toFixed(0)}k` : `R$${v}`}
+                  width={52}
+                />
+                <Tooltip
+                  formatter={(v: number) => [formatCurrency(v), "Receita"]}
+                  labelFormatter={(label) => `Período: ${label}`}
+                />
+                <Area type="monotone" dataKey="value" stroke="#D9468F" fill="url(#dash-grad)" strokeWidth={2} dot={chartData.length <= 12} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
