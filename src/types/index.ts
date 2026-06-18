@@ -59,6 +59,8 @@ export interface Product {
 export interface OrderItem {
   id: number;
   product_id: number;
+  product_name: string | null;
+  product_number: number | null;
   quantity: number;
   unit_price: string;
   subtotal: string;
