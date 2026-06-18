@@ -253,7 +253,7 @@ export function SearchOrders() {
                     <tr key={item.id} className="border-t border-gray-100">
                       <td className="px-3 py-2">
                         <span className="font-medium text-sm text-gray-800">
-                          {item.product_name || (item.product_id ? `Produto #${item.name}` : `Item #${item.id}`)}
+                          {item.product_name || (item.product_id ? `Produto #${item.product_id}` : `Item #${item.id}`)}
                         </span>
                         {item.product_number != null && (
                           <span className="ml-1 text-xs text-gray-400">#{item.product_number}</span>
