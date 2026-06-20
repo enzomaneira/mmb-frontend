@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/format";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, type Order, type OrderStatus } from "../types";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, type OrderStatus } from "../types";
 import { Alert } from "../components/ui/Alert";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
