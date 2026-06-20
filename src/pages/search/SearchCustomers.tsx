@@ -81,6 +81,7 @@ export function SearchCustomers() {
         <Select label="Ordenar por" value={sortBy} onChange={(e) => setSortBy(e.target.value)}
           options={[
             { value: "name", label: "Nome" },
+            { value: "number", label: "Número de cadastro" },
             { value: "total_orders", label: "Nº de pedidos" },
             { value: "total_spent", label: "Total gasto" },
             { value: "total_units", label: "Unidades compradas" },

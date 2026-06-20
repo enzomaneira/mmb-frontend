@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/format";
-import { PRODUCT_TYPE_LABELS, type Product, type ProductType } from "../../types";
+import { PRODUCT_TYPE_LABELS, type Product, type ProductType, type SortOrder } from "../../types";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
+import { SortToggle } from "../../components/ui/SortToggle";
 import { Modal } from "../../components/ui/Modal";
 
 const typeOptions = Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => ({ value, label }));
@@ -16,6 +17,8 @@ export function EditProducts() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterStock, setFilterStock] = useState<"all" | "zero" | "low" | "ok">("all");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [form, setForm] = useState({
@@ -25,8 +28,8 @@ export function EditProducts() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const products = useQuery({
-    queryKey: ["products"],
-    queryFn: () => api.products.list({ sort_by: "name" }),
+    queryKey: ["products", sortBy, sortOrder],
+    queryFn: () => api.products.list({ sort_by: sortBy, sort_order: sortOrder }),
   });
 
   const updateMutation = useMutation({
@@ -124,6 +127,20 @@ export function EditProducts() {
             { value: "ok", label: "Em estoque (>3)" },
           ]}
         />
+        <Select
+          label="Ordenar por"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          options={[
+            { value: "name", label: "Nome" },
+            { value: "number", label: "Número de cadastro" },
+            { value: "price", label: "Preço" },
+            { value: "units_sold", label: "Unidades vendidas" },
+            { value: "revenue", label: "Receita" },
+            { value: "stock_quantity", label: "Estoque" },
+          ]}
+        />
+        <div className="flex items-end"><SortToggle value={sortOrder} onChange={setSortOrder} /></div>
         <div className="flex items-end pb-1">
           <span className="text-sm text-gray-500">{filtered.length} produto{filtered.length !== 1 ? "s" : ""}</span>
         </div>

@@ -2,23 +2,27 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/format";
-import type { Customer } from "../../types";
+import type { Customer, SortOrder } from "../../types";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { SortToggle } from "../../components/ui/SortToggle";
 import { Modal } from "../../components/ui/Modal";
 
 export function EditCustomers() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [form, setForm] = useState({ number: "", name: "", email: "", phone: "", notes: "" });
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const customers = useQuery({
-    queryKey: ["customers"],
-    queryFn: () => api.customers.list({ sort_by: "name" }),
+    queryKey: ["customers", sortBy, sortOrder],
+    queryFn: () => api.customers.list({ sort_by: sortBy, sort_order: sortOrder }),
   });
 
   const updateMutation = useMutation({
@@ -84,7 +88,7 @@ export function EditCustomers() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <Input
           label="Buscar (nome, número, telefone, e-mail)"
           value={search}
@@ -92,6 +96,19 @@ export function EditCustomers() {
           className="min-w-[280px]"
           placeholder="Digite para filtrar..."
         />
+        <Select
+          label="Ordenar por"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          options={[
+            { value: "name", label: "Nome" },
+            { value: "number", label: "Número de cadastro" },
+            { value: "total_orders", label: "Nº de pedidos" },
+            { value: "total_spent", label: "Total gasto" },
+            { value: "total_units", label: "Unidades compradas" },
+          ]}
+        />
+        <div className="flex items-end"><SortToggle value={sortOrder} onChange={setSortOrder} /></div>
         <div className="flex items-end">
           <span className="text-sm text-gray-500">
             {filtered.length} cliente{filtered.length !== 1 ? "s" : ""}

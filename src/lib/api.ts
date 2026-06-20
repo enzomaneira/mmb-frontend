@@ -196,10 +196,22 @@ export const api = {
         body: JSON.stringify(data),
       }),
 
-    updateStatus: (id: number, status: OrderStatus) =>
+    update: (
+      id: number,
+      data: {
+        customer_id?: number;
+        items?: { product_id: number; quantity: number; unit_price?: number }[];
+      },
+    ) =>
+      request<Order>(`/orders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    updateStatus: (id: number, status: OrderStatus, changed_at?: string) =>
       request<Order>(`/orders/${id}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(changed_at ? { changed_at } : {}) }),
       }),
 
     delete: (id: number) =>

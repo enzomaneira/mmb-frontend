@@ -95,6 +95,7 @@ export function SearchProducts() {
         <Select label="Ordenar por" value={sortBy} onChange={(e) => setSortBy(e.target.value)}
           options={[
             { value: "name", label: "Nome" },
+            { value: "number", label: "Número de cadastro" },
             { value: "price", label: "Preço" },
             { value: "units_sold", label: "Unidades vendidas" },
             { value: "revenue", label: "Receita" },
