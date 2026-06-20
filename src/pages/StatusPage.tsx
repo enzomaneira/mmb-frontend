@@ -200,7 +200,11 @@ export function StatusPage() {
                 type="date"
                 value={changedAt}
                 onChange={(e) => setChangedAt(e.target.value)}
-                hint="Deixe em branco para usar a data/hora atual"
+                hint={
+                  newStatus === selectedOrder.status
+                    ? "Mesmo status: informe uma data para sobrescrever a data registrada"
+                    : "Deixe em branco para usar a data/hora atual"
+                }
               />
 
               <Button
