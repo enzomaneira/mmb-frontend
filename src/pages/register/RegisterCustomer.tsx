@@ -14,6 +14,12 @@ function formatPhone(raw: string): string {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
+// Returns today's date as YYYY-MM-DD in local timezone
+function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function RegisterCustomer() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
@@ -22,6 +28,7 @@ export function RegisterCustomer() {
     email: "",
     phone: "",
     notes: "",
+    created_at: todayLocal(),
   });
   const [errors, setErrors] = useState<Partial<typeof form>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -46,12 +53,13 @@ export function RegisterCustomer() {
         email: form.email.trim() || undefined,
         phone: form.phone.replace(/\D/g, "") || undefined,
         notes: form.notes.trim() || undefined,
+        created_at: form.created_at ? `${form.created_at}T12:00:00` : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customers-count"] });
       setMessage({ type: "success", text: `✅ Cliente "${form.name}" cadastrado com sucesso!` });
-      setForm({ number: "", name: "", email: "", phone: "", notes: "" });
+      setForm({ number: "", name: "", email: "", phone: "", notes: "", created_at: todayLocal() });
       setErrors({});
     },
     onError: (err: Error) => {
@@ -68,6 +76,7 @@ export function RegisterCustomer() {
       newErrors.email = "E-mail inválido";
     if (form.phone && form.phone.replace(/\D/g, "").length < 10)
       newErrors.phone = "Telefone incompleto (mín. 10 dígitos)";
+    if (!form.created_at) newErrors.created_at = "Data de cadastro é obrigatória";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -81,6 +90,7 @@ export function RegisterCustomer() {
   const fillNextNumber = () => {
     if (!form.number) setForm((f) => ({ ...f, number: String(nextNumber) }));
   };
+
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -154,6 +164,23 @@ export function RegisterCustomer() {
                 if (errors.name) setErrors({ ...errors, name: undefined });
               }}
             />
+
+            {/* Data de cadastro */}
+            <div className="sm:col-span-2">
+              <Input
+                label="Data de cadastro"
+                icon="📅"
+                type="date"
+                required
+                value={form.created_at}
+                error={errors.created_at}
+                hint="Data em que o cliente foi cadastrado"
+                onChange={(e) => {
+                  setForm({ ...form, created_at: e.target.value });
+                  if (errors.created_at) setErrors({ ...errors, created_at: undefined });
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -235,7 +262,7 @@ export function RegisterCustomer() {
             variant="ghost"
             className="py-3"
             onClick={() => {
-              setForm({ number: "", name: "", email: "", phone: "", notes: "" });
+              setForm({ number: "", name: "", email: "", phone: "", notes: "", created_at: todayLocal() });
               setErrors({});
               setMessage(null);
             }}

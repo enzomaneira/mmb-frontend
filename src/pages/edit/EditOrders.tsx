@@ -50,6 +50,8 @@ export function EditOrders() {
   // Edit form
   const [editCustomerId, setEditCustomerId] = useState("");
   const [editCustomerSearch, setEditCustomerSearch] = useState("");
+  const [editCreatedAt, setEditCreatedAt] = useState("");
+  const [editCreatedAtError, setEditCreatedAtError] = useState("");
   const [editItems, setEditItems] = useState<ItemForm[]>([]);
   const [editProductSearch, setEditProductSearch] = useState("");
 
@@ -77,6 +79,7 @@ export function EditOrders() {
     mutationFn: () =>
       api.orders.update(selectedOrder!.id, {
         customer_id: editCustomerId ? Number(editCustomerId) : undefined,
+        created_at: editCreatedAt ? `${editCreatedAt}T12:00:00` : undefined,
         items: editItems.map((i) => ({
           product_id: Number(i.product_id),
           quantity: Number(i.quantity),
@@ -131,10 +134,18 @@ export function EditOrders() {
 
   // ─── Edit helpers ────────────────────────────────────────────────────────────
 
+  const toDateInput = (iso: string | Date | undefined): string => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
   const openEdit = (order: Order) => {
     setSelectedOrder(order);
     setEditCustomerId(String(order.customer_id));
     setEditCustomerSearch(customerMap.get(order.customer_id)?.name ?? "");
+    setEditCreatedAt(toDateInput(order.created_at));
+    setEditCreatedAtError("");
     setEditProductSearch("");
     setEditItems(
       order.items.map((item) => ({
@@ -468,6 +479,23 @@ export function EditOrders() {
                   ✓ Cliente selecionado: {customerMap.get(Number(editCustomerId))?.name}
                 </p>
               )}
+            </div>
+
+            {/* Data de cadastro */}
+            <div className="space-y-2">
+              <Input
+                label="Data de cadastro do pedido"
+                icon="📅"
+                type="date"
+                required
+                value={editCreatedAt}
+                error={editCreatedAtError}
+                hint="Data em que o pedido foi realizado"
+                onChange={(e) => {
+                  setEditCreatedAt(e.target.value);
+                  if (editCreatedAtError) setEditCreatedAtError("");
+                }}
+              />
             </div>
 
             {/* Items */}

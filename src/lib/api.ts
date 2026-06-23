@@ -91,6 +91,7 @@ export const api = {
       email?: string;
       phone?: string;
       notes?: string;
+      created_at?: string;
     }) =>
       request<Customer>("/customers", {
         method: "POST",
@@ -105,6 +106,7 @@ export const api = {
         email: string;
         phone: string;
         notes: string;
+        created_at: string;
       }>,
     ) =>
       request<Customer>(`/customers/${id}`, {
@@ -140,6 +142,7 @@ export const api = {
       product_type: ProductType;
       price: number;
       stock_quantity?: number;
+      created_at?: string;
     }) =>
       request<Product>("/products", {
         method: "POST",
@@ -155,6 +158,7 @@ export const api = {
         product_type: ProductType;
         price: number;
         stock_quantity: number;
+        created_at: string;
       }>,
     ) =>
       request<Product>(`/products/${id}`, {
@@ -189,6 +193,7 @@ export const api = {
       number: number;
       customer_id: number;
       status?: OrderStatus;
+      created_at?: string;
       items: { product_id: number; quantity: number; unit_price?: number }[];
     }) =>
       request<Order>("/orders", {
@@ -200,6 +205,7 @@ export const api = {
       id: number,
       data: {
         customer_id?: number;
+        created_at?: string;
         items?: { product_id: number; quantity: number; unit_price?: number }[];
       },
     ) =>

@@ -29,6 +29,12 @@ const productTypeOptions = Object.entries(PRODUCT_TYPE_LABELS).map(([value, labe
   label: `${PRODUCT_TYPE_ICONS[value as ProductType]} ${label}`,
 }));
 
+// Returns today's date as YYYY-MM-DD in local timezone
+function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function RegisterProduct() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
@@ -38,6 +44,7 @@ export function RegisterProduct() {
     product_type: "TOYS" as ProductType,
     price: "",
     stock_quantity: "0",
+    created_at: todayLocal(),
   });
   const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -63,6 +70,7 @@ export function RegisterProduct() {
         product_type: form.product_type,
         price: Number(form.price),
         stock_quantity: Number(form.stock_quantity),
+        created_at: form.created_at ? `${form.created_at}T12:00:00` : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -75,6 +83,7 @@ export function RegisterProduct() {
         product_type: "TOYS",
         price: "",
         stock_quantity: "0",
+        created_at: todayLocal(),
       });
       setErrors({});
     },
@@ -91,6 +100,7 @@ export function RegisterProduct() {
     if (!form.price || Number(form.price) <= 0) newErrors.price = "Preço deve ser maior que zero";
     if (form.stock_quantity === "" || Number(form.stock_quantity) < 0)
       newErrors.stock_quantity = "Estoque não pode ser negativo";
+    if (!form.created_at) newErrors.created_at = "Data de cadastro é obrigatória";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -191,6 +201,23 @@ export function RegisterProduct() {
                 onChange={(e) => {
                   setForm({ ...form, name: e.target.value });
                   if (errors.name) setErrors({ ...errors, name: undefined });
+                }}
+              />
+            </div>
+
+            {/* Data de cadastro */}
+            <div className="sm:col-span-2">
+              <Input
+                label="Data de cadastro"
+                icon="📅"
+                type="date"
+                required
+                value={form.created_at}
+                error={errors.created_at}
+                hint="Data em que o produto foi cadastrado"
+                onChange={(e) => {
+                  setForm({ ...form, created_at: e.target.value });
+                  if (errors.created_at) setErrors({ ...errors, created_at: undefined });
                 }}
               />
             </div>
@@ -325,7 +352,7 @@ export function RegisterProduct() {
             variant="ghost"
             className="py-3"
             onClick={() => {
-              setForm({ number: "", name: "", description: "", product_type: "TOYS", price: "", stock_quantity: "0" });
+              setForm({ number: "", name: "", description: "", product_type: "TOYS", price: "", stock_quantity: "0", created_at: todayLocal() });
               setErrors({});
               setMessage(null);
             }}

@@ -10,6 +10,22 @@ import { Select } from "../../components/ui/Select";
 import { SortToggle } from "../../components/ui/SortToggle";
 import { Modal } from "../../components/ui/Modal";
 
+// Convert an ISO datetime string to YYYY-MM-DD for date inputs
+function toDateInput(iso: string | Date | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Phone formatting helper (e.g. 11912345678 → (11) 91234-5678)
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 export function EditCustomers() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -17,7 +33,10 @@ export function EditCustomers() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [mode, setMode] = useState<"view" | "edit">("view");
-  const [form, setForm] = useState({ number: "", name: "", email: "", phone: "", notes: "" });
+  const [form, setForm] = useState({
+    number: "", name: "", email: "", phone: "", notes: "", created_at: "",
+  });
+  const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const customers = useQuery({
@@ -25,19 +44,35 @@ export function EditCustomers() {
     queryFn: () => api.customers.list({ sort_by: sortBy, sort_order: sortOrder }),
   });
 
+  const validate = (): boolean => {
+    const newErrors: Partial<Record<keyof typeof form, string>> = {};
+    if (!form.number || Number(form.number) < 1) newErrors.number = "Número inválido (mín. 1)";
+    if (!form.name.trim()) newErrors.name = "Nome é obrigatório";
+    else if (form.name.trim().length < 2) newErrors.name = "Nome muito curto";
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      newErrors.email = "E-mail inválido";
+    if (form.phone && form.phone.replace(/\D/g, "").length < 10)
+      newErrors.phone = "Telefone incompleto (mín. 10 dígitos)";
+    if (!form.created_at) newErrors.created_at = "Data de cadastro é obrigatória";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const updateMutation = useMutation({
     mutationFn: () =>
       api.customers.update(selectedCustomer!.id, {
         number: Number(form.number),
-        name: form.name,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
-        notes: form.notes || undefined,
+        name: form.name.trim(),
+        email: form.email.trim() || undefined,
+        phone: form.phone.replace(/\D/g, "") || undefined,
+        notes: form.notes.trim() || undefined,
+        created_at: form.created_at ? `${form.created_at}T12:00:00` : undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+      setSelectedCustomer(updated);
       setMode("view");
-      setMessage({ type: "success", text: "Cliente atualizado com sucesso!" });
+      setMessage({ type: "success", text: "✅ Cliente atualizado com sucesso!" });
     },
     onError: (err: Error) => setMessage({ type: "error", text: err.message }),
   });
@@ -56,6 +91,7 @@ export function EditCustomers() {
     setSelectedCustomer(customer);
     setMode("view");
     setMessage(null);
+    setErrors({});
   };
 
   const openEdit = (customer: Customer) => {
@@ -64,9 +100,11 @@ export function EditCustomers() {
       number: String(customer.number),
       name: customer.name,
       email: customer.email ?? "",
-      phone: customer.phone ?? "",
+      phone: customer.phone ? formatPhone(customer.phone) : "",
       notes: customer.notes ?? "",
+      created_at: toDateInput(customer.created_at),
     });
+    setErrors({});
     setMode("edit");
     setMessage(null);
   };
@@ -159,10 +197,15 @@ export function EditCustomers() {
       {/* Detail / Edit Modal */}
       <Modal
         open={!!selectedCustomer}
-        onClose={() => setSelectedCustomer(null)}
-        title={mode === "edit" ? `Editando: ${selectedCustomer?.name}` : `Cliente #${selectedCustomer?.number}`}
+        onClose={() => { setSelectedCustomer(null); setErrors({}); }}
+        title={
+          mode === "edit"
+            ? `✏️ Editando: ${selectedCustomer?.name}`
+            : `👤 Cliente #${selectedCustomer?.number}`
+        }
         size="lg"
       >
+        {/* ── VIEW MODE ── */}
         {selectedCustomer && mode === "view" && (
           <div className="space-y-5">
             {/* Stats row */}
@@ -193,7 +236,7 @@ export function EditCustomers() {
               </div>
               <div>
                 <p className="font-medium text-gray-500">Telefone</p>
-                <p>{selectedCustomer.phone ?? "—"}</p>
+                <p>{selectedCustomer.phone ? formatPhone(selectedCustomer.phone) : "—"}</p>
               </div>
               <div>
                 <p className="font-medium text-gray-500">E-mail</p>
@@ -216,14 +259,12 @@ export function EditCustomers() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 border-t border-gray-100 pt-4">
-              <Button onClick={() => openEdit(selectedCustomer)} variant="secondary">
-                ✏️ Editar
-              </Button>
+            <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+              <Button onClick={() => openEdit(selectedCustomer)} variant="secondary">✏️ Editar</Button>
               <Button
                 variant="danger"
                 onClick={() => {
-                  if (confirm(`Remover cliente ${selectedCustomer.name}?`))
+                  if (confirm(`Remover cliente "${selectedCustomer.name}"? Esta ação não pode ser desfeita.`))
                     deleteMutation.mutate(selectedCustomer.id);
                 }}
                 loading={deleteMutation.isPending}
@@ -237,35 +278,134 @@ export function EditCustomers() {
           </div>
         )}
 
+        {/* ── EDIT MODE ── */}
         {selectedCustomer && mode === "edit" && (
           <form
-            onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }}
+            onSubmit={(e) => { e.preventDefault(); if (validate()) updateMutation.mutate(); }}
             className="space-y-4"
+            noValidate
           >
             {message && (
               <Alert type={message.type} message={message.text} onClose={() => setMessage(null)} />
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input label="Número" type="number" required value={form.number}
-                onChange={(e) => setForm({ ...form, number: e.target.value })} />
-              <Input label="Nome" required value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <Input label="E-mail" type="email" value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              <Input label="Telefone" value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+
+            {/* Card: Dados básicos */}
+            <div className="rounded-2xl border border-brand-pink/20 bg-gray-50 p-5">
+              <div className="mb-4 flex items-center gap-2 border-b border-brand-pink/10 pb-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-pink/20 text-sm">👤</span>
+                <h4 className="font-semibold text-brand-pink-deep">Dados básicos</h4>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  label="Número do cliente"
+                  icon="🔢"
+                  type="number"
+                  min={1}
+                  required
+                  value={form.number}
+                  error={errors.number}
+                  hint="Código numérico único"
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, "");
+                    setForm((f) => ({ ...f, number: val }));
+                    if (errors.number) setErrors((er) => ({ ...er, number: undefined }));
+                  }}
+                />
+                <Input
+                  label="Nome completo"
+                  icon="✏️"
+                  type="text"
+                  required
+                  maxLength={255}
+                  placeholder="Nome completo do cliente"
+                  value={form.name}
+                  error={errors.name}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, name: e.target.value }));
+                    if (errors.name) setErrors((er) => ({ ...er, name: undefined }));
+                  }}
+                />
+
+                {/* Data de cadastro (full width) */}
+                <div className="sm:col-span-2">
+                  <Input
+                    label="Data de cadastro"
+                    icon="📅"
+                    type="date"
+                    required
+                    value={form.created_at}
+                    error={errors.created_at}
+                    hint="Data original de cadastro do cliente"
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, created_at: e.target.value }));
+                      if (errors.created_at) setErrors((er) => ({ ...er, created_at: undefined }));
+                    }}
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-              <textarea
-                rows={3}
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                className="w-full rounded-xl border border-brand-pink/50 px-3 py-2 text-sm outline-none focus:border-brand-pink-deep focus:ring-2 focus:ring-brand-pink/30"
-              />
+
+            {/* Card: Contato */}
+            <div className="rounded-2xl border border-brand-pink/20 bg-gray-50 p-5">
+              <div className="mb-4 flex items-center gap-2 border-b border-brand-pink/10 pb-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-yellow/40 text-sm">📞</span>
+                <h4 className="font-semibold text-brand-pink-deep">Contato</h4>
+                <span className="ml-auto text-xs text-gray-400">Opcional</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  label="Telefone / WhatsApp"
+                  icon="📱"
+                  type="tel"
+                  placeholder="(11) 91234-5678"
+                  value={form.phone}
+                  error={errors.phone}
+                  hint="Com DDD, sem espaços"
+                  onChange={(e) => {
+                    const formatted = formatPhone(e.target.value);
+                    setForm((f) => ({ ...f, phone: formatted }));
+                    if (errors.phone) setErrors((er) => ({ ...er, phone: undefined }));
+                  }}
+                />
+                <Input
+                  label="E-mail"
+                  icon="✉️"
+                  type="email"
+                  placeholder="exemplo@email.com"
+                  value={form.email}
+                  error={errors.email}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, email: e.target.value }));
+                    if (errors.email) setErrors((er) => ({ ...er, email: undefined }));
+                  }}
+                />
+              </div>
             </div>
-            <div className="flex gap-2 border-t border-gray-100 pt-4">
-              <Button type="submit" loading={updateMutation.isPending}>Salvar</Button>
+
+            {/* Card: Observações */}
+            <div className="rounded-2xl border border-brand-pink/20 bg-gray-50 p-5">
+              <div className="mb-4 flex items-center gap-2 border-b border-brand-pink/10 pb-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-sm">📝</span>
+                <h4 className="font-semibold text-brand-pink-deep">Observações</h4>
+                <span className="ml-auto text-xs text-gray-400">Opcional</span>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-gray-700">📄 Notas sobre o cliente</label>
+                <textarea
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Preferências, restrições, histórico especial..."
+                  value={form.notes}
+                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                  className="w-full rounded-xl border-2 border-brand-pink/40 bg-white px-4 py-2.5 text-sm font-medium shadow-sm outline-none transition-all placeholder:font-normal placeholder:text-gray-300 hover:border-brand-pink focus:border-brand-pink-deep focus:ring-2 focus:ring-brand-pink/30 resize-none"
+                />
+                <p className="text-right text-xs text-gray-400">{form.notes.length}/500</p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-2">
+              <Button type="submit" loading={updateMutation.isPending}>💾 Salvar alterações</Button>
               <Button type="button" variant="ghost" onClick={() => setMode("view")}>Cancelar</Button>
             </div>
           </form>

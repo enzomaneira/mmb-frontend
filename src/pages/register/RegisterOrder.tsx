@@ -28,6 +28,12 @@ const statusOptions = Object.entries(ORDER_STATUS_LABELS).map(([value, label]) =
   label: `${STATUS_ICONS[value as OrderStatus]} ${label}`,
 }));
 
+// Returns today's date as YYYY-MM-DD in local timezone
+function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function RegisterOrder() {
   const queryClient = useQueryClient();
   const customers = useQuery({ queryKey: ["customers"], queryFn: () => api.customers.list({ sort_by: "name" }) });
@@ -40,6 +46,8 @@ export function RegisterOrder() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [status, setStatus] = useState<OrderStatus>("PENDING");
+  const [createdAt, setCreatedAt] = useState(todayLocal());
+  const [createdAtError, setCreatedAtError] = useState("");
   const [items, setItems] = useState<OrderItemForm[]>([
     { product_id: "", quantity: "1", unit_price: "" },
   ]);
@@ -63,6 +71,7 @@ export function RegisterOrder() {
         number: Number(number),
         customer_id: Number(customerId),
         status,
+        created_at: createdAt ? `${createdAt}T12:00:00` : undefined,
         items: items.map((i) => ({
           product_id: Number(i.product_id),
           quantity: Number(i.quantity),
@@ -80,6 +89,7 @@ export function RegisterOrder() {
       setCustomerSearch("");
       setProductSearch("");
       setStatus("PENDING");
+      setCreatedAt(todayLocal());
       setItems([{ product_id: "", quantity: "1", unit_price: "" }]);
       setItemErrors({});
     },
@@ -139,6 +149,11 @@ export function RegisterOrder() {
       setCustomerError("Selecione um cliente");
       valid = false;
     } else setCustomerError("");
+
+    if (!createdAt) {
+      setCreatedAtError("Data de cadastro é obrigatória");
+      valid = false;
+    } else setCreatedAtError("");
 
     const newItemErrors: Record<number, string> = {};
     items.forEach((item, idx) => {
@@ -257,6 +272,23 @@ export function RegisterOrder() {
               onChange={(e) => setStatus(e.target.value as OrderStatus)}
               options={statusOptions}
             />
+
+            {/* Data de cadastro */}
+            <div className="sm:col-span-2">
+              <Input
+                label="Data de cadastro"
+                icon="📅"
+                type="date"
+                required
+                value={createdAt}
+                error={createdAtError}
+                hint="Data em que o pedido foi realizado"
+                onChange={(e) => {
+                  setCreatedAt(e.target.value);
+                  if (createdAtError) setCreatedAtError("");
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -508,16 +540,18 @@ export function RegisterOrder() {
             variant="ghost"
             className="py-3"
             onClick={() => {
-              setNumber("");
-              setCustomerId("");
-              setCustomerSearch("");
-              setProductSearch("");
-              setStatus("PENDING");
-              setItems([{ product_id: "", quantity: "1", unit_price: "" }]);
-              setItemErrors({});
-              setMessage(null);
-              setNumberError("");
-              setCustomerError("");
+      setNumber("");
+      setCustomerId("");
+      setCustomerSearch("");
+      setProductSearch("");
+      setStatus("PENDING");
+      setCreatedAt(todayLocal());
+      setCreatedAtError("");
+      setItems([{ product_id: "", quantity: "1", unit_price: "" }]);
+      setItemErrors({});
+      setMessage(null);
+      setNumberError("");
+      setCustomerError("");
             }}
           >
             Limpar
