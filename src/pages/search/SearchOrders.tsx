@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/format";
@@ -6,35 +6,53 @@ import {
   ORDER_STATUS_LABELS, ORDER_STATUS_COLORS,
   type Order, type OrderStatus, type SortOrder
 } from "../../types";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { SortToggle } from "../../components/ui/SortToggle";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Modal } from "../../components/ui/Modal";
-import { Button } from "../../components/ui/Button";
+
+interface ItemForm {
+  product_id: string;
+  quantity: string;
+  unit_price: string;
+}
 
 const ALL_STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
 
+function toDateInput(iso: string | Date | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function SearchOrders() {
+  const queryClient = useQueryClient();
+
   const [minTotal, setMinTotal] = useState("");
   const [maxTotal, setMaxTotal] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  // Local filters
   const [activeStatuses, setActiveStatuses] = useState<Set<OrderStatus>>(new Set());
   const [searchNumber, setSearchNumber] = useState("");
   const [minItems, setMinItems] = useState("");
   const [maxItems, setMaxItems] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [selected, setSelected] = useState<Order | null>(null);
 
-  const customers = useQuery({
-    queryKey: ["customers-list"],
-    queryFn: () => api.customers.list(),
-  });
-  const customerMap = new Map(customers.data?.map((c) => [c.id, c]) ?? []);
+  const [selected, setSelected] = useState<Order | null>(null);
+  const [mode, setMode] = useState<"view" | "edit">("view");
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const [editCustomerId, setEditCustomerId] = useState("");
+  const [editCustomerSearch, setEditCustomerSearch] = useState("");
+  const [editCreatedAt, setEditCreatedAt] = useState("");
+  const [editCreatedAtError, setEditCreatedAtError] = useState("");
+  const [editItems, setEditItems] = useState<ItemForm[]>([]);
+  const [editProductSearch, setEditProductSearch] = useState("");
 
   const query = useQuery({
     queryKey: ["orders-search", minTotal, maxTotal, startDate, endDate, sortBy, sortOrder],
@@ -48,6 +66,53 @@ export function SearchOrders() {
       }),
   });
 
+  const customers = useQuery({
+    queryKey: ["customers-list"],
+    queryFn: () => api.customers.list({ sort_by: "name" }),
+  });
+  const customerMap = new Map(customers.data?.map((c) => [c.id, c]) ?? []);
+
+  const products = useQuery({
+    queryKey: ["products-list"],
+    queryFn: () => api.products.list({ sort_by: "name" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      api.orders.update(selected!.id, {
+        customer_id: editCustomerId ? Number(editCustomerId) : undefined,
+        created_at: editCreatedAt ? `${editCreatedAt}T12:00:00` : undefined,
+        items: editItems.map((i) => ({
+          product_id: Number(i.product_id),
+          quantity: Number(i.quantity),
+          unit_price: i.unit_price !== "" ? Number(i.unit_price) : undefined,
+        })),
+      }),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders-search"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue"] });
+      setSelected(updated);
+      setMode("view");
+      setMessage({ type: "success", text: "Pedido atualizado com sucesso!" });
+    },
+    onError: (err: Error) => setMessage({ type: "error", text: err.message }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.orders.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders-search"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue"] });
+      setSelected(null);
+      setMessage({ type: "success", text: "Pedido removido com sucesso!" });
+    },
+    onError: (err: Error) => setMessage({ type: "error", text: err.message }),
+  });
+
   const toggleStatus = (s: OrderStatus) => {
     setActiveStatuses((prev) => {
       const next = new Set(prev);
@@ -55,6 +120,58 @@ export function SearchOrders() {
       return next;
     });
   };
+
+  const openView = (o: Order) => { setSelected(o); setMode("view"); setMessage(null); };
+
+  const openEdit = (order: Order) => {
+    setSelected(order);
+    setEditCustomerId(String(order.customer_id));
+    setEditCustomerSearch(customerMap.get(order.customer_id)?.name ?? "");
+    setEditCreatedAt(toDateInput(order.created_at));
+    setEditCreatedAtError("");
+    setEditProductSearch("");
+    setEditItems(order.items.map((item) => ({
+      product_id: String(item.product_id),
+      quantity: String(item.quantity),
+      unit_price: item.unit_price,
+    })));
+    setMode("edit");
+    setMessage(null);
+  };
+
+  const addItem = () => setEditItems([...editItems, { product_id: "", quantity: "1", unit_price: "" }]);
+  const removeItem = (index: number) => setEditItems(editItems.filter((_, i) => i !== index));
+  const updateItem = (index: number, field: keyof ItemForm, value: string) =>
+    setEditItems(editItems.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+
+  const handleProductChange = (index: number, productId: string) => {
+    const product = products.data?.find((p) => String(p.id) === productId);
+    updateItem(index, "product_id", productId);
+    if (product && editItems[index].unit_price === "") {
+      updateItem(index, "unit_price", product.price);
+    }
+  };
+
+  const clearFilters = () => {
+    setMinTotal(""); setMaxTotal(""); setStartDate(""); setEndDate("");
+    setSearchNumber(""); setMinItems(""); setMaxItems(""); setActiveStatuses(new Set());
+  };
+
+  const filteredCustomerOptions = (customers.data ?? [])
+    .filter((c) =>
+      !editCustomerSearch ||
+      c.name.toLowerCase().includes(editCustomerSearch.toLowerCase()) ||
+      String(c.number).includes(editCustomerSearch),
+    )
+    .slice(0, 50);
+
+  const filteredProductOptions = (products.data ?? [])
+    .filter((p) =>
+      !editProductSearch ||
+      p.name.toLowerCase().includes(editProductSearch.toLowerCase()) ||
+      String(p.number).includes(editProductSearch),
+    )
+    .slice(0, 50);
 
   const filtered = (query.data ?? []).filter((o) => {
     if (activeStatuses.size > 0 && !activeStatuses.has(o.status)) return false;
@@ -64,25 +181,26 @@ export function SearchOrders() {
     return true;
   });
 
-  // Summary stats
   const totalValue = filtered.reduce((s, o) => s + parseFloat(o.total), 0);
   const avgValue = filtered.length > 0 ? totalValue / filtered.length : 0;
-
-  const clearFilters = () => {
-    setMinTotal(""); setMaxTotal(""); setStartDate(""); setEndDate("");
-    setSearchNumber(""); setMinItems(""); setMaxItems(""); setActiveStatuses(new Set());
-  };
-
-  const activeFilterCount = [minTotal, maxTotal, startDate, endDate, searchNumber, minItems, maxItems].filter(Boolean).length + activeStatuses.size;
+  const activeFilterCount =
+    [minTotal, maxTotal, startDate, endDate, searchNumber, minItems, maxItems].filter(Boolean).length +
+    activeStatuses.size;
 
   return (
     <div className="space-y-5">
+      {message && (
+        <Alert type={message.type} message={message.text} onClose={() => setMessage(null)} />
+      )}
+
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="page-title">Buscar pedidos</h3>
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition border ${
-            showFilters ? "border-brand-pink-deep bg-brand-pink/10 text-brand-pink-deep" : "border-gray-200 text-gray-600 hover:border-brand-pink/40"
+            showFilters
+              ? "border-brand-pink-deep bg-brand-pink/10 text-brand-pink-deep"
+              : "border-gray-200 text-gray-600 hover:border-brand-pink/40"
           }`}
         >
           🔧 Filtros avançados
@@ -97,7 +215,8 @@ export function SearchOrders() {
       {/* Status pills */}
       <div className="flex flex-wrap gap-2">
         {ALL_STATUSES.map((s) => (
-          <button key={s}
+          <button
+            key={s}
             onClick={() => toggleStatus(s)}
             className={`rounded-full px-3 py-1 text-xs font-semibold transition border ${
               activeStatuses.has(s) ? "ring-2 ring-offset-1 ring-brand-pink-deep" : "opacity-75 hover:opacity-100"
@@ -107,8 +226,10 @@ export function SearchOrders() {
           </button>
         ))}
         {activeStatuses.size > 0 && (
-          <button onClick={() => setActiveStatuses(new Set())}
-            className="rounded-full px-3 py-1 text-xs font-medium text-gray-500 hover:text-gray-700">
+          <button
+            onClick={() => setActiveStatuses(new Set())}
+            className="rounded-full px-3 py-1 text-xs font-medium text-gray-500 hover:text-gray-700"
+          >
             ✕ Limpar status
           </button>
         )}
@@ -116,9 +237,17 @@ export function SearchOrders() {
 
       {/* Primary search row */}
       <div className="flex flex-wrap items-end gap-3">
-        <Input label="Número do pedido" value={searchNumber}
-          onChange={(e) => setSearchNumber(e.target.value)} className="w-40" placeholder="#..." />
-        <Select label="Ordenar por" value={sortBy} onChange={(e) => setSortBy(e.target.value)}
+        <Input
+          label="Número do pedido"
+          value={searchNumber}
+          onChange={(e) => setSearchNumber(e.target.value)}
+          className="w-40"
+          placeholder="#..."
+        />
+        <Select
+          label="Ordenar por"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
           options={[
             { value: "created_at", label: "Data" },
             { value: "total", label: "Total" },
@@ -178,12 +307,13 @@ export function SearchOrders() {
           </thead>
           <tbody>
             {filtered.map((o) => (
-              <tr key={o.id} onClick={() => setSelected(o)}
-                className="cursor-pointer border-t border-gray-100 hover:bg-brand-pink/10 transition">
+              <tr
+                key={o.id}
+                onClick={() => openView(o)}
+                className="cursor-pointer border-t border-gray-100 hover:bg-brand-pink/10 transition"
+              >
                 <td className="px-4 py-3 font-mono text-xs text-gray-500">#{o.number}</td>
-                <td className="px-4 py-3">
-                  {customerMap.get(o.customer_id)?.name ?? `Cliente #${o.customer_id}`}
-                </td>
+                <td className="px-4 py-3">{customerMap.get(o.customer_id)?.name ?? `Cliente #${o.customer_id}`}</td>
                 <td className="px-4 py-3">{formatDate(o.created_at)}</td>
                 <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
                 <td className="px-4 py-3">{o.items.length}</td>
@@ -198,12 +328,16 @@ export function SearchOrders() {
         )}
       </div>
 
-      {/* Detail Modal */}
-      <Modal open={!!selected} onClose={() => setSelected(null)}
-        title={`Pedido #${selected?.number}`} size="lg">
-        {selected && (
+      {/* Detail / Edit Modal */}
+      <Modal
+        open={!!selected}
+        onClose={() => { setSelected(null); setMode("view"); }}
+        title={mode === "edit" ? `✏️ Editando pedido #${selected?.number}` : `📦 Pedido #${selected?.number}`}
+        size="xl"
+      >
+        {/* VIEW MODE */}
+        {selected && mode === "view" && (
           <div className="space-y-5">
-            {/* Customer info */}
             {customerMap.get(selected.customer_id) && (
               <div className="rounded-xl bg-brand-yellow/20 px-4 py-3">
                 <p className="text-xs text-gray-500 font-medium">Cliente</p>
@@ -212,7 +346,9 @@ export function SearchOrders() {
                 </p>
                 <p className="text-sm text-gray-600">
                   {customerMap.get(selected.customer_id)!.phone ?? ""}
-                  {customerMap.get(selected.customer_id)!.email ? ` · ${customerMap.get(selected.customer_id)!.email}` : ""}
+                  {customerMap.get(selected.customer_id)!.email
+                    ? ` · ${customerMap.get(selected.customer_id)!.email}`
+                    : ""}
                 </p>
               </div>
             )}
@@ -236,7 +372,6 @@ export function SearchOrders() {
               </div>
             </div>
 
-            {/* Items */}
             <div>
               <h4 className="mb-2 text-sm font-semibold text-gray-600">Itens</h4>
               <table className="w-full text-sm">
@@ -268,7 +403,6 @@ export function SearchOrders() {
               </table>
             </div>
 
-            {/* Status history */}
             <div>
               <h4 className="mb-2 text-sm font-semibold text-gray-600">Histórico de status</h4>
               <ul className="space-y-1">
@@ -280,7 +414,163 @@ export function SearchOrders() {
                 ))}
               </ul>
             </div>
+
+            <div className="flex gap-2 border-t border-gray-100 pt-4">
+              <Button variant="secondary" onClick={() => openEdit(selected)}>✏️ Editar pedido</Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  if (confirm(`Remover pedido #${selected.number}? Esta ação não pode ser desfeita.`))
+                    deleteMutation.mutate(selected.id);
+                }}
+                loading={deleteMutation.isPending}
+              >
+                🗑️ Excluir pedido
+              </Button>
+              <Button variant="ghost" onClick={() => { setSelected(null); setMode("view"); }} className="ml-auto">
+                Fechar
+              </Button>
+            </div>
           </div>
+        )}
+
+        {/* EDIT MODE */}
+        {selected && mode === "edit" && (
+          <form onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }} className="space-y-5">
+            {message && (
+              <Alert type={message.type} message={message.text} onClose={() => setMessage(null)} />
+            )}
+
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-gray-700">Cliente</p>
+              <Input
+                placeholder="Buscar cliente por nome ou número..."
+                value={editCustomerSearch}
+                onChange={(e) => setEditCustomerSearch(e.target.value)}
+              />
+              <div className="max-h-40 overflow-y-auto rounded-xl border border-brand-pink/20">
+                {filteredCustomerOptions.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => { setEditCustomerId(String(c.id)); setEditCustomerSearch(c.name); }}
+                    className={`w-full px-4 py-2 text-left text-sm transition hover:bg-brand-pink/10 ${
+                      editCustomerId === String(c.id)
+                        ? "bg-brand-pink/20 font-semibold text-brand-pink-deep"
+                        : "text-gray-700"
+                    }`}
+                  >
+                    #{c.number} — {c.name}
+                  </button>
+                ))}
+              </div>
+              {editCustomerId && (
+                <p className="text-xs text-green-600 font-medium">
+                  ✓ Cliente selecionado: {customerMap.get(Number(editCustomerId))?.name}
+                </p>
+              )}
+            </div>
+
+            <Input
+              label="Data de cadastro do pedido"
+              icon="📅"
+              type="date"
+              required
+              value={editCreatedAt}
+              error={editCreatedAtError}
+              hint="Data em que o pedido foi realizado"
+              onChange={(e) => { setEditCreatedAt(e.target.value); if (editCreatedAtError) setEditCreatedAtError(""); }}
+            />
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-700">Itens do pedido</p>
+                <Button type="button" variant="secondary" onClick={addItem} className="text-xs px-3 py-1.5">
+                  + Adicionar item
+                </Button>
+              </div>
+
+              <Input
+                placeholder="Filtrar produtos por nome ou número..."
+                value={editProductSearch}
+                onChange={(e) => setEditProductSearch(e.target.value)}
+              />
+
+              {editItems.map((item, index) => {
+                const selProd = products.data?.find((p) => String(p.id) === item.product_id);
+                return (
+                  <div key={index} className="rounded-xl border border-brand-pink/20 bg-brand-pink/5 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-500">
+                        Item {index + 1}
+                        {selProd && <span className="ml-2 text-brand-pink-deep">— {selProd.name}</span>}
+                      </span>
+                      {editItems.length > 1 && (
+                        <button type="button" onClick={() => removeItem(index)}
+                          className="text-xs text-red-500 hover:text-red-700">
+                          ✕ Remover
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="sm:col-span-3">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Produto <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          required
+                          value={item.product_id}
+                          onChange={(e) => handleProductChange(index, e.target.value)}
+                          className="w-full rounded-xl border-2 border-brand-pink/40 bg-white px-3 py-2 text-sm outline-none focus:border-brand-pink-deep"
+                        >
+                          <option value="">Selecione um produto...</option>
+                          {filteredProductOptions.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              #{p.number} — {p.name} (R$ {p.price})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Input label="Quantidade" type="number" min={1} required
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, "quantity", e.target.value)} />
+                      <Input label="Preço unitário (R$)" type="number" step="0.01" min={0}
+                        value={item.unit_price}
+                        onChange={(e) => updateItem(index, "unit_price", e.target.value)}
+                        hint="Deixe vazio para usar o preço do produto" />
+                      {item.product_id && item.quantity && item.unit_price && (
+                        <div className="flex items-end pb-2">
+                          <p className="text-xs text-gray-500">
+                            Subtotal:{" "}
+                            <span className="font-semibold text-brand-pink-deep">
+                              {formatCurrency(Number(item.unit_price) * Number(item.quantity))}
+                            </span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {editItems.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-2">
+                  Nenhum item. Clique em "+ Adicionar item".
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2 border-t border-gray-100 pt-4">
+              <Button
+                type="submit"
+                loading={updateMutation.isPending}
+                disabled={!editCustomerId || editItems.length === 0 || editItems.some((i) => !i.product_id)}
+              >
+                💾 Salvar alterações
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setMode("view")}>Cancelar</Button>
+            </div>
+          </form>
         )}
       </Modal>
     </div>

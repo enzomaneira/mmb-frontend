@@ -2,14 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/layout/Layout";
 import { ChartsPage } from "./pages/ChartsPage";
 import { Dashboard } from "./pages/Dashboard";
-import { EditPage } from "./pages/EditPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SearchPage } from "./pages/SearchPage";
 import { StatusPage } from "./pages/StatusPage";
 import { StockPage } from "./pages/StockPage";
-import { EditCustomers } from "./pages/edit/EditCustomers";
-import { EditOrders } from "./pages/edit/EditOrders";
-import { EditProducts } from "./pages/edit/EditProducts";
 import { RegisterCustomer } from "./pages/register/RegisterCustomer";
 import { RegisterOrder } from "./pages/register/RegisterOrder";
 import { RegisterProduct } from "./pages/register/RegisterProduct";
@@ -36,11 +32,11 @@ export function App() {
           <Route path="graficos" element={<ChartsPage />} />
           <Route path="status" element={<StatusPage />} />
           <Route path="estoque" element={<StockPage />} />
-          <Route path="edicao" element={<EditPage />}>
-            <Route path="clientes" element={<EditCustomers />} />
-            <Route path="produtos" element={<EditProducts />} />
-            <Route path="pedidos" element={<EditOrders />} />
-          </Route>
+          {/* Redirect legacy /edicao/* routes to /busca/* */}
+          <Route path="edicao/clientes" element={<Navigate to="/busca/clientes" replace />} />
+          <Route path="edicao/produtos" element={<Navigate to="/busca/produtos" replace />} />
+          <Route path="edicao/pedidos" element={<Navigate to="/busca/pedidos" replace />} />
+          <Route path="edicao" element={<Navigate to="/busca" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

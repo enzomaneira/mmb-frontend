@@ -7,7 +7,6 @@ const links = [
   { to: "/graficos", label: "Gráficos" },
   { to: "/status", label: "Status" },
   { to: "/estoque", label: "Estoque" },
-  { to: "/edicao", label: "Edição" },
 ];
 
 export function Navbar() {
