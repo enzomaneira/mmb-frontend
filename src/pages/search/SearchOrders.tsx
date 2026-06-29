@@ -18,6 +18,11 @@ interface ItemForm {
   product_id: string;
   quantity: string;
   unit_price: string;
+  search: string; // ← busca exclusiva de cada item
+}
+
+function newEditItem(): ItemForm {
+  return { product_id: "", quantity: "1", unit_price: "", search: "" };
 }
 
 const ALL_STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
@@ -52,7 +57,7 @@ export function SearchOrders() {
   const [editCreatedAt, setEditCreatedAt] = useState("");
   const [editCreatedAtError, setEditCreatedAtError] = useState("");
   const [editItems, setEditItems] = useState<ItemForm[]>([]);
-  const [editProductSearch, setEditProductSearch] = useState("");
+  const [editActiveTab, setEditActiveTab] = useState(0);
 
   const query = useQuery({
     queryKey: ["orders-search", minTotal, maxTotal, startDate, endDate, sortBy, sortOrder],
@@ -129,27 +134,41 @@ export function SearchOrders() {
     setEditCustomerSearch(customerMap.get(order.customer_id)?.name ?? "");
     setEditCreatedAt(toDateInput(order.created_at));
     setEditCreatedAtError("");
-    setEditProductSearch("");
+    setEditActiveTab(0);
     setEditItems(order.items.map((item) => ({
       product_id: String(item.product_id),
       quantity: String(item.quantity),
       unit_price: item.unit_price,
+      search: "",
     })));
     setMode("edit");
     setMessage(null);
   };
 
-  const addItem = () => setEditItems([...editItems, { product_id: "", quantity: "1", unit_price: "" }]);
-  const removeItem = (index: number) => setEditItems(editItems.filter((_, i) => i !== index));
-  const updateItem = (index: number, field: keyof ItemForm, value: string) =>
-    setEditItems(editItems.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  const addItem = () => {
+    setEditItems([...editItems, newEditItem()]);
+    setEditActiveTab(editItems.length); // vai direto para a nova aba
+  };
 
-  const handleProductChange = (index: number, productId: string) => {
-    const product = products.data?.find((p) => String(p.id) === productId);
-    updateItem(index, "product_id", productId);
-    if (product && editItems[index].unit_price === "") {
-      updateItem(index, "unit_price", product.price);
+  const removeItem = (index: number) => {
+    if (editItems.length === 1) return;
+    const next = editItems.filter((_, i) => i !== index);
+    setEditItems(next);
+    setEditActiveTab(Math.min(editActiveTab, next.length - 1));
+  };
+
+  const updateItem = (index: number, field: keyof ItemForm, value: string) => {
+    const next = editItems.map((item, i) => (i === index ? { ...item, [field]: value } : item));
+    // Auto-preenche preço ao selecionar produto
+    if (field === "product_id" && value) {
+      const product = products.data?.find((p) => String(p.id) === value);
+      if (product && next[index].unit_price === "") next[index] = { ...next[index], unit_price: product.price };
     }
+    setEditItems(next);
+  };
+
+  const adjustQty = (index: number, delta: number) => {
+    updateItem(index, "quantity", String(Math.max(1, Number(editItems[index].quantity) + delta)));
   };
 
   const clearFilters = () => {
@@ -165,13 +184,24 @@ export function SearchOrders() {
     )
     .slice(0, 50);
 
-  const filteredProductOptions = (products.data ?? [])
-    .filter((p) =>
-      !editProductSearch ||
-      p.name.toLowerCase().includes(editProductSearch.toLowerCase()) ||
-      String(p.number).includes(editProductSearch),
-    )
-    .slice(0, 50);
+  const getFilteredProducts = (itemSearch: string) =>
+    (products.data ?? []).filter(
+      (p) =>
+        !itemSearch ||
+        p.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
+        String(p.number).includes(itemSearch),
+    ).slice(0, 100);
+
+  const getProductOptions = (itemSearch: string) => {
+    const filtered = getFilteredProducts(itemSearch);
+    return [
+      { value: "", label: itemSearch && filtered.length === 0 ? "Nenhum produto encontrado" : "Selecione um produto...", disabled: true },
+      ...filtered.map((p) => ({
+        value: String(p.id),
+        label: `#${p.number} — ${p.name} · ${formatCurrency(p.price)}`,
+      })),
+    ];
+  };
 
   const filtered = (query.data ?? []).filter((o) => {
     if (activeStatuses.size > 0 && !activeStatuses.has(o.status)) return false;
@@ -186,6 +216,23 @@ export function SearchOrders() {
   const activeFilterCount =
     [minTotal, maxTotal, startDate, endDate, searchNumber, minItems, maxItems].filter(Boolean).length +
     activeStatuses.size;
+
+  // ─── Item ativo na edição ──────────────────────────────────────────────────
+  const activeEditItem = editItems[editActiveTab];
+  const activeEditProduct = products.data?.find((p) => String(p.id) === activeEditItem?.product_id);
+  const activeEditSubtotal =
+    activeEditItem
+      ? (activeEditItem.unit_price !== ""
+          ? parseFloat(activeEditItem.unit_price)
+          : parseFloat(activeEditProduct?.price ?? "0")) * Number(activeEditItem.quantity || 0)
+      : 0;
+
+  // Total estimado na edição
+  const editEstimatedTotal = editItems.reduce((sum, item) => {
+    const prod = products.data?.find((p) => String(p.id) === item.product_id);
+    const price = item.unit_price !== "" ? parseFloat(item.unit_price) : parseFloat(prod?.price ?? "0");
+    return sum + price * Number(item.quantity || 0);
+  }, 0);
 
   return (
     <div className="space-y-5">
@@ -441,6 +488,7 @@ export function SearchOrders() {
               <Alert type={message.type} message={message.text} onClose={() => setMessage(null)} />
             )}
 
+            {/* Cliente */}
             <div className="space-y-2">
               <p className="text-sm font-semibold text-gray-700">Cliente</p>
               <Input
@@ -471,6 +519,7 @@ export function SearchOrders() {
               )}
             </div>
 
+            {/* Data */}
             <Input
               label="Data de cadastro do pedido"
               icon="📅"
@@ -482,83 +531,195 @@ export function SearchOrders() {
               onChange={(e) => { setEditCreatedAt(e.target.value); if (editCreatedAtError) setEditCreatedAtError(""); }}
             />
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-700">Itens do pedido</p>
-                <Button type="button" variant="secondary" onClick={addItem} className="text-xs px-3 py-1.5">
-                  + Adicionar item
-                </Button>
+            {/* Itens com abas independentes */}
+            <div className="rounded-2xl border border-brand-pink/20 bg-white shadow-sm">
+              {/* Cabeçalho */}
+              <div className="flex items-center gap-2 border-b border-brand-pink/10 px-4 pt-4 pb-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-sm">📋</span>
+                <p className="text-sm font-semibold text-brand-pink-deep">Itens do pedido</p>
+                <span className="ml-auto text-xs text-gray-400">{editItems.length} item{editItems.length !== 1 ? "s" : ""}</span>
               </div>
 
-              <Input
-                placeholder="Filtrar produtos por nome ou número..."
-                value={editProductSearch}
-                onChange={(e) => setEditProductSearch(e.target.value)}
-              />
-
-              {editItems.map((item, index) => {
-                const selProd = products.data?.find((p) => String(p.id) === item.product_id);
-                return (
-                  <div key={index} className="rounded-xl border border-brand-pink/20 bg-brand-pink/5 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-gray-500">
-                        Item {index + 1}
-                        {selProd && <span className="ml-2 text-brand-pink-deep">— {selProd.name}</span>}
+              {/* Abas de navegação */}
+              <div className="flex items-center gap-1 overflow-x-auto border-b border-gray-100 bg-gray-50/60 px-3 py-2 scrollbar-none">
+                {editItems.map((item, idx) => {
+                  const prod = products.data?.find((p) => String(p.id) === item.product_id);
+                  const isActive = editActiveTab === idx;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setEditActiveTab(idx)}
+                      className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition whitespace-nowrap
+                        ${isActive
+                          ? "bg-white shadow-sm border border-brand-pink/30 text-brand-pink-deep"
+                          : "text-gray-500 hover:bg-white hover:text-gray-700"
+                        }`}
+                    >
+                      {prod ? <span>🧸</span> : <span className="opacity-40">○</span>}
+                      <span>
+                        {prod
+                          ? prod.name.length > 18
+                            ? prod.name.slice(0, 18) + "…"
+                            : prod.name
+                          : `Item ${idx + 1}`}
                       </span>
-                      {editItems.length > 1 && (
-                        <button type="button" onClick={() => removeItem(index)}
-                          className="text-xs text-red-500 hover:text-red-700">
-                          ✕ Remover
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      <div className="sm:col-span-3">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Produto <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          required
-                          value={item.product_id}
-                          onChange={(e) => handleProductChange(index, e.target.value)}
-                          className="w-full rounded-xl border-2 border-brand-pink/40 bg-white px-3 py-2 text-sm outline-none focus:border-brand-pink-deep"
+                      {isActive && editItems.length > 1 && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => { e.stopPropagation(); removeItem(idx); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); removeItem(idx); } }}
+                          className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-gray-400 hover:bg-red-100 hover:text-red-500 transition cursor-pointer"
+                          title="Remover item"
                         >
-                          <option value="">Selecione um produto...</option>
-                          {filteredProductOptions.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              #{p.number} — {p.name} (R$ {p.price})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <Input label="Quantidade" type="number" min={1} required
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, "quantity", e.target.value)} />
-                      <Input label="Preço unitário (R$)" type="number" step="0.01" min={0}
-                        value={item.unit_price}
-                        onChange={(e) => updateItem(index, "unit_price", e.target.value)}
-                        hint="Deixe vazio para usar o preço do produto" />
-                      {item.product_id && item.quantity && item.unit_price && (
-                        <div className="flex items-end pb-2">
-                          <p className="text-xs text-gray-500">
-                            Subtotal:{" "}
-                            <span className="font-semibold text-brand-pink-deep">
-                              {formatCurrency(Number(item.unit_price) * Number(item.quantity))}
-                            </span>
-                          </p>
-                        </div>
+                          ✕
+                        </span>
                       )}
+                    </button>
+                  );
+                })}
+
+                {/* Botão nova aba */}
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-dashed border-brand-pink/40 px-3 py-1.5 text-xs font-semibold text-brand-pink-deep hover:border-brand-pink hover:bg-brand-pink/5 transition"
+                >
+                  <span className="text-base leading-none">+</span>
+                  Novo item
+                </button>
+              </div>
+
+              {/* Conteúdo da aba ativa */}
+              {activeEditItem && (
+                <div className="p-4 space-y-4">
+
+                  {/* Busca exclusiva do item */}
+                  <Input
+                    label={`🔍 Buscar produto para o Item ${editActiveTab + 1}`}
+                    type="text"
+                    placeholder="Digite o nome do produto..."
+                    value={activeEditItem.search}
+                    hint={`${getFilteredProducts(activeEditItem.search).length} produto${getFilteredProducts(activeEditItem.search).length !== 1 ? "s" : ""} encontrado${getFilteredProducts(activeEditItem.search).length !== 1 ? "s" : ""}`}
+                    onChange={(e) => updateItem(editActiveTab, "search", e.target.value)}
+                  />
+
+                  {/* Seleção do produto */}
+                  <div>
+                    <Select
+                      label="Produto" icon="🧸" required
+                      value={activeEditItem.product_id}
+                      onChange={(e) => updateItem(editActiveTab, "product_id", e.target.value)}
+                      options={getProductOptions(activeEditItem.search)}
+                    />
+                    {activeEditProduct && (
+                      <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5 text-xs">
+                        <span className="font-medium text-gray-700">Preço original:</span>
+                        <span className="font-bold text-brand-pink-deep">{formatCurrency(activeEditProduct.price)}</span>
+                        <span className="mx-1 text-gray-300">·</span>
+                        <span className="text-gray-500">Estoque:</span>
+                        <span className={`font-bold ${activeEditProduct.stock_quantity === 0 ? "text-red-600" : activeEditProduct.stock_quantity <= 3 ? "text-yellow-600" : "text-green-600"}`}>
+                          {activeEditProduct.stock_quantity} un.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Preço e Quantidade */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Input
+                      label="Preço unitário" icon="💲" type="number" min={0} step="0.01"
+                      prefix="R$"
+                      placeholder={activeEditProduct ? String(parseFloat(activeEditProduct.price).toFixed(2)) : "0,00"}
+                      hint="Deixe vazio para usar o preço do produto"
+                      value={activeEditItem.unit_price}
+                      onChange={(e) => updateItem(editActiveTab, "unit_price", e.target.value.replace(/[^0-9.]/g, ""))}
+                    />
+                    <div className="flex flex-col gap-1.5">
+                      <label className="flex items-center gap-1 text-sm font-semibold text-gray-700">
+                        <span className="text-base leading-none">🔢</span>
+                        Quantidade
+                        <span className="text-brand-pink-deep">*</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => adjustQty(editActiveTab, -1)}
+                          disabled={Number(activeEditItem.quantity) <= 1}
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-brand-pink/40 bg-white text-lg font-bold text-brand-pink-deep shadow-sm transition hover:border-brand-pink hover:bg-brand-pink/10 active:scale-95 disabled:opacity-40">
+                          −
+                        </button>
+                        <input
+                          type="number" min={1} required
+                          value={activeEditItem.quantity}
+                          onChange={(e) => updateItem(editActiveTab, "quantity", e.target.value.replace(/[^0-9]/g, "") || "1")}
+                          className="min-w-0 flex-1 rounded-xl border-2 border-brand-pink/40 bg-white px-4 py-2.5 text-center text-sm font-bold shadow-sm outline-none transition hover:border-brand-pink focus:border-brand-pink-deep focus:ring-2 focus:ring-brand-pink/30 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
+                        />
+                        <button type="button" onClick={() => adjustQty(editActiveTab, 1)}
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-brand-pink/40 bg-white text-lg font-bold text-brand-pink-deep shadow-sm transition hover:border-brand-pink hover:bg-brand-pink/10 active:scale-95">
+                          +
+                        </button>
+                      </div>
                     </div>
                   </div>
-                );
-              })}
+
+                  {/* Subtotal do item ativo */}
+                  {activeEditSubtotal > 0 && (
+                    <div className="flex items-center justify-end gap-2 rounded-xl bg-brand-pink/5 px-4 py-2">
+                      <span className="text-xs text-gray-500">Subtotal deste item:</span>
+                      <span className="font-bold text-brand-pink-deep">{formatCurrency(activeEditSubtotal)}</span>
+                    </div>
+                  )}
+
+                  {/* Navegação entre abas */}
+                  {editItems.length > 1 && (
+                    <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                      <button type="button" onClick={() => setEditActiveTab((t) => Math.max(0, t - 1))}
+                        disabled={editActiveTab === 0}
+                        className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition">
+                        ← Item anterior
+                      </button>
+                      <span className="text-xs text-gray-400">
+                        {editActiveTab + 1} / {editItems.length}
+                      </span>
+                      <button type="button" onClick={() => setEditActiveTab((t) => Math.min(editItems.length - 1, t + 1))}
+                        disabled={editActiveTab === editItems.length - 1}
+                        className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition">
+                        Próximo item →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {editItems.length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-2">
-                  Nenhum item. Clique em "+ Adicionar item".
+                <p className="p-4 text-center text-sm text-gray-400">
+                  Nenhum item. Clique em "+ Novo item".
                 </p>
               )}
             </div>
+
+            {/* Total estimado na edição */}
+            {editEstimatedTotal > 0 && (
+              <div className="flex items-center justify-between rounded-xl border-2 border-brand-pink/30 bg-gradient-to-r from-brand-pink/10 to-brand-yellow/10 px-5 py-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs text-gray-500">Total estimado</p>
+                  <div className="space-y-0.5">
+                    {editItems.map((item, idx) => {
+                      const prod = products.data?.find((p) => String(p.id) === item.product_id);
+                      if (!prod) return null;
+                      const price = item.unit_price !== "" ? parseFloat(item.unit_price) : parseFloat(prod.price);
+                      const sub = price * Number(item.quantity || 0);
+                      return (
+                        <p key={idx} className="text-xs text-gray-500">
+                          Item {idx + 1}: {prod.name} × {item.quantity} = {formatCurrency(sub)}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
+                <span className="text-xl font-bold text-brand-pink-deep">{formatCurrency(editEstimatedTotal)}</span>
+              </div>
+            )}
 
             <div className="flex gap-2 border-t border-gray-100 pt-4">
               <Button
