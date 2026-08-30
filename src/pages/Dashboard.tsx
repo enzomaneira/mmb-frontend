@@ -108,6 +108,12 @@ export function Dashboard() {
     ? paidOrders.reduce((s, o) => s + parseFloat(o.total), 0) / paidOrders.length
     : 0;
 
+  // Total value of stock (price × quantity for each product)
+  const totalStockValue = (products.data ?? []).reduce(
+    (sum, p) => sum + parseFloat(p.price) * p.stock_quantity,
+    0,
+  );
+
   return (
     <div className="space-y-6">
       {/* Hero */}
@@ -133,11 +139,12 @@ export function Dashboard() {
       </div>
 
       {/* Key stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Clientes cadastrados" value={customers.data?.length ?? "—"} sub="Total no sistema" />
         <StatCard label="Produtos cadastrados" value={products.data?.length ?? "—"} sub="Total no catálogo" />
         <StatCard label="Pedidos pagos" value={paidOrders.length} sub={`Ticket médio: ${formatCurrency(avgOrderValue)}`} color="text-green-600" />
         <StatCard label="Receita total" value={formatCurrency(totalRevenue)} sub={thisMonthRevenue ? `Este mês: ${formatCurrency(parseFloat(thisMonthRevenue.value))}` : undefined} color="text-brand-pink-deep" />
+        <StatCard label="Valor em estoque" value={formatCurrency(totalStockValue)} sub="Valor total dos produtos" color="text-green-600" />
       </div>
 
       {/* Status breakdown + Revenue mini-chart */}
