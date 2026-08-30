@@ -260,6 +260,8 @@ export const api = {
       start_month?: number;
       end_year?: number;
       end_month?: number;
+      product_type?: ProductType;
+      product_id?: number;
     }) => request<MonthlyRevenue[]>(`/revenue${buildQuery(params ?? {})}`),
 
     chart: (params?: {
@@ -267,6 +269,8 @@ export const api = {
       start_month?: number;
       end_year?: number;
       end_month?: number;
+      product_type?: ProductType;
+      product_id?: number;
     }) =>
       request<RevenueChartPoint[]>(`/revenue/chart${buildQuery(params ?? {})}`),
   },
@@ -285,21 +289,29 @@ export const api = {
       customer_id: number;
       start_date?: string;
       end_date?: string;
+      product_type?: ProductType;
+      product_id?: number;
     }) =>
       request<ChartPoint[]>(`/charts/sales-by-customer${buildQuery(params)}`),
 
-    topProducts: (limit = 10) =>
-      request<TopProduct[]>(`/charts/top-products?limit=${limit}`),
+    topProducts: (limit = 10, product_type?: ProductType) =>
+      request<TopProduct[]>(
+        `/charts/top-products?limit=${limit}${product_type ? `&product_type=${product_type}` : ""}`,
+      ),
 
     totalSales: (params?: {
       granularity?: "day" | "month" | "year";
       start_date?: string;
       end_date?: string;
+      product_type?: ProductType;
+      product_id?: number;
     }) =>
       request<ChartPoint[]>(`/charts/total-sales${buildQuery(params ?? {})}`),
 
-    productRevenueShare: () =>
-      request<ProductRevenueShare[]>("/charts/product-revenue-share"),
+    productRevenueShare: (product_type?: ProductType) =>
+      request<ProductRevenueShare[]>(
+        `/charts/product-revenue-share${product_type ? `?product_type=${product_type}` : ""}`,
+      ),
   },
 };
 

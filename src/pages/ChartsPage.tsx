@@ -15,6 +15,7 @@ import { formatCurrency } from "../lib/format";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Modal } from "../components/ui/Modal";
+import { ProductType, PRODUCT_TYPE_LABELS } from "../types";
 
 // ─── Colour palette ──────────────────────────────────────────────────────────
 const COLORS = ["#D9468F","#FFE066","#E879A9","#F5C518","#F8B4D9","#B5E3E3","#A78BFA","#6EE7B7","#FCA5A5","#93C5FD"];
@@ -244,6 +245,10 @@ function FilterRow({ children }: { children: React.ReactNode }) {
 
 // ─── Main Charts Page ─────────────────────────────────────────────────────────
 export function ChartsPage() {
+  // ── Global filters: Segmento + Produto ──
+  const [global_segment, setGlobalSegment] = useState<ProductType | "">("");
+  const [global_productId, setGlobalProductId] = useState("");
+
   // ── Filters: "Vendas por produto" ──
   const [ps_productId, setPsProductId]     = useState("");
   const [ps_startDate, setPsStartDate]     = useState("");
@@ -267,6 +272,10 @@ export function ChartsPage() {
   const [mr_startMonth, setMrStartMonth]   = useState("");
   const [mr_endYear, setMrEndYear]         = useState("");
   const [mr_endMonth, setMrEndMonth]       = useState("");
+
+  // Derived: segment as ProductType | undefined for API calls
+  const segType = global_segment || undefined;
+  const segProductId = global_productId ? Number(global_productId) : undefined;
 
   // ── Per-chart type selections ──
   const [typeProductSales, setTypeProductSales]   = useState<ChartType>("line");
@@ -295,48 +304,68 @@ export function ChartsPage() {
   });
 
   const salesByCustomer = useQuery({
-    queryKey: ["chart-customer", cs_customerId, cs_startDate, cs_endDate],
+    queryKey: ["chart-customer", cs_customerId, cs_startDate, cs_endDate, segType, segProductId],
     queryFn: () => api.charts.salesByCustomer({
       customer_id: Number(cs_customerId),
       start_date: cs_startDate ? `${cs_startDate}T00:00:00` : undefined,
       end_date:   cs_endDate   ? `${cs_endDate}T23:59:59`   : undefined,
+      product_type: segType,
+      product_id: segProductId,
     }),
     enabled: !!cs_customerId,
   });
 
   const topProducts = useQuery({
-    queryKey: ["chart-top", top_limit],
-    queryFn: () => api.charts.topProducts(top_limit),
+    queryKey: ["chart-top", top_limit, segType],
+    queryFn: () => api.charts.topProducts(top_limit, segType),
   });
 
   const totalSales = useQuery({
-    queryKey: ["chart-total", ts_granularity, ts_startDate, ts_endDate],
+    queryKey: ["chart-total", ts_granularity, ts_startDate, ts_endDate, segType, segProductId],
     queryFn: () => api.charts.totalSales({
       granularity: ts_granularity,
       start_date: ts_startDate ? `${ts_startDate}T00:00:00` : undefined,
       end_date:   ts_endDate   ? `${ts_endDate}T23:59:59`   : undefined,
+      product_type: segType,
+      product_id: segProductId,
     }),
   });
 
   const revenueShare = useQuery({
-    queryKey: ["chart-share"],
-    queryFn: () => api.charts.productRevenueShare(),
+    queryKey: ["chart-share", segType],
+    queryFn: () => api.charts.productRevenueShare(segType),
   });
 
   const revenueChart = useQuery({
-    queryKey: ["revenue-chart", mr_startYear, mr_startMonth, mr_endYear, mr_endMonth],
+    queryKey: ["revenue-chart", mr_startYear, mr_startMonth, mr_endYear, mr_endMonth, segType, segProductId],
     queryFn: () => api.revenue.chart({
       start_year:  mr_startYear  ? Number(mr_startYear)  : undefined,
       start_month: mr_startMonth ? Number(mr_startMonth) : undefined,
       end_year:    mr_endYear    ? Number(mr_endYear)    : undefined,
       end_month:   mr_endMonth   ? Number(mr_endMonth)   : undefined,
+      product_type: segType,
+      product_id: segProductId,
     }),
   });
 
   // ── Option lists ──
+  const segmentOptions = [
+    { value: "", label: "Todos os segmentos" },
+    ...Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+  ];
+
+  // Products filtered by global segment
+  const filteredProducts = (products.data ?? []).filter(
+    (p) => !global_segment || p.product_type === global_segment
+  );
+
   const productOptions = [
+    { value: "", label: "Todos os produtos" },
+    ...filteredProducts.map((p) => ({ value: String(p.id), label: `#${p.number} — ${p.name}` })),
+  ];
+  const productOptionsForProductChart = [
     { value: "", label: "Selecione um produto" },
-    ...(products.data?.map((p) => ({ value: String(p.id), label: `#${p.number} — ${p.name}` })) ?? []),
+    ...filteredProducts.map((p) => ({ value: String(p.id), label: `#${p.number} — ${p.name}` })),
   ];
   const customerOptions = [
     { value: "", label: "Selecione um cliente" },
@@ -388,7 +417,7 @@ export function ChartsPage() {
       filters: (
         <>
           <Select label="Produto" value={ps_productId}
-            onChange={(e) => setPsProductId(e.target.value)} options={productOptions} />
+            onChange={(e) => setPsProductId(e.target.value)} options={productOptionsForProductChart} />
           <Input label="Data início" type="date" value={ps_startDate}
             onChange={(e) => setPsStartDate(e.target.value)} />
           <Input label="Data fim" type="date" value={ps_endDate}
@@ -398,7 +427,7 @@ export function ChartsPage() {
     },
     {
       id: "customer-sales",
-      title: "Compras por cliente (R$)",
+      title: `Compras por cliente (R$)${segType || segProductId ? " — filtrado" : ""}`,
       type: typeCustomerSales, setType: setTypeCustomerSales,
       data: customerSalesData, dataKey: "value", nameKey: "date",
       disablePie: false, disableRadar: false, angleLabel: false,
@@ -417,7 +446,7 @@ export function ChartsPage() {
     },
     {
       id: "top-products",
-      title: "Produtos mais vendidos (qtd.)",
+      title: `Produtos mais vendidos (qtd.)${segType ? ` — ${PRODUCT_TYPE_LABELS[segType]}` : ""}`,
       type: typeTopProducts, setType: setTypeTopProducts,
       data: topData, dataKey: "units_sold", nameKey: "product_name",
       disablePie: false, disableRadar: false, angleLabel: true,
@@ -433,7 +462,7 @@ export function ChartsPage() {
     },
     {
       id: "revenue-share",
-      title: "Distribuição de receita (%)",
+      title: `Distribuição de receita (%)${segType ? ` — ${PRODUCT_TYPE_LABELS[segType]}` : ""}`,
       type: typeRevenueShare, setType: setTypeRevenueShare,
       data: shareData, dataKey: "percentage", nameKey: "product_name",
       disablePie: false, disableRadar: false, angleLabel: false,
@@ -441,7 +470,7 @@ export function ChartsPage() {
     },
     {
       id: "total-sales",
-      title: "Vendas totais no período (R$)",
+      title: `Vendas totais no período (R$)${segType || segProductId ? " — filtrado" : ""}`,
       type: typeTotalSales, setType: setTypeTotalSales,
       data: totalData, dataKey: "value", nameKey: "date",
       disablePie: true, disableRadar: true, angleLabel: false,
@@ -464,7 +493,7 @@ export function ChartsPage() {
     },
     {
       id: "monthly-revenue",
-      title: "Receita mensal (R$)",
+      title: `Receita mensal (R$)${segType || segProductId ? " — filtrado" : ""}`,
       type: typeMonthly, setType: setTypeMonthly,
       data: monthlyData, dataKey: "value", nameKey: "period",
       disablePie: true, disableRadar: true, angleLabel: false,
@@ -489,6 +518,45 @@ export function ChartsPage() {
   return (
     <div className="space-y-8">
       <h2 className="page-title">Gráficos e relatórios</h2>
+
+      {/* Global filters: Segmento + Produto */}
+      <div className="section-card">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-sm font-semibold text-brand-pink-deep">🔍 Filtro global</span>
+          <span className="text-xs text-gray-400">
+            Aplica-se a: Top produtos, Vendas totais, Distribuição de receita, Receita mensal,
+            Compras por cliente
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Select
+            label="Segmento (tipo de produto)"
+            value={global_segment}
+            onChange={(e) => {
+              setGlobalSegment(e.target.value as ProductType | "");
+              setGlobalProductId(""); // reset product when segment changes
+            }}
+            options={segmentOptions}
+          />
+          <Select
+            label="Produto específico"
+            value={global_productId}
+            onChange={(e) => setGlobalProductId(e.target.value)}
+            options={productOptions}
+          />
+          {(global_segment || global_productId) && (
+            <button
+              onClick={() => {
+                setGlobalSegment("");
+                setGlobalProductId("");
+              }}
+              className="self-end rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-500 hover:border-brand-pink/40 hover:text-brand-pink-deep transition"
+            >
+              ✕ Limpar filtros
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Charts grid */}
       <div className="grid gap-6 lg:grid-cols-2">
