@@ -48,7 +48,7 @@ export function RegisterOrder() {
   const [customerId, setCustomerId] = useState("");
   const [customerError, setCustomerError] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
-  const [status, setStatus] = useState<OrderStatus>("PENDING");
+  const [status, setStatus] = useState<OrderStatus>("IN_PROGRESS");
   const [createdAt, setCreatedAt] = useState(todayLocal());
   const [createdAtError, setCreatedAtError] = useState("");
   const [items, setItems] = useState<OrderItemForm[]>([newItem()]);
@@ -88,7 +88,7 @@ export function RegisterOrder() {
       setNumber("");
       setCustomerId("");
       setCustomerSearch("");
-      setStatus("PENDING");
+      setStatus("IN_PROGRESS");
       setCreatedAt(todayLocal());
       setItems([newItem()]);
       setItemErrors({});
@@ -531,7 +531,7 @@ export function RegisterOrder() {
           <Button type="button" variant="ghost" className="py-3"
             onClick={() => {
               setNumber(""); setCustomerId(""); setCustomerSearch("");
-              setStatus("PENDING"); setCreatedAt(todayLocal()); setCreatedAtError("");
+              setStatus("IN_PROGRESS"); setCreatedAt(todayLocal()); setCreatedAtError("");
               setItems([newItem()]); setItemErrors({}); setMessage(null);
               setNumberError(""); setCustomerError(""); setActiveTab(0);
             }}>
