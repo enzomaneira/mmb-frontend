@@ -4,6 +4,7 @@ import type {
   CustomerWithOrders,
   MonthlyRevenue,
   Order,
+  OrderPayment,
   OrderStatus,
   Product,
   ProductRevenueShare,
@@ -222,6 +223,35 @@ export const api = {
 
     delete: (id: number) =>
       request<void>(`/orders/${id}`, { method: "DELETE" }),
+  },
+
+  payments: {
+    list: (orderId: number) =>
+      request<OrderPayment[]>(`/orders/${orderId}/payments`),
+
+    create: (
+      orderId: number,
+      data: { amount: number; paid_at?: string; note?: string },
+    ) =>
+      request<OrderPayment>(`/orders/${orderId}/payments`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    update: (
+      orderId: number,
+      paymentId: number,
+      data: { amount?: number; paid_at?: string; note?: string },
+    ) =>
+      request<OrderPayment>(`/orders/${orderId}/payments/${paymentId}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+
+    delete: (orderId: number, paymentId: number) =>
+      request<void>(`/orders/${orderId}/payments/${paymentId}`, {
+        method: "DELETE",
+      }),
   },
 
   revenue: {

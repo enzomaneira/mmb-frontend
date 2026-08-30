@@ -72,6 +72,15 @@ export interface OrderStatusHistory {
   changed_at: string;
 }
 
+export interface OrderPayment {
+  id: number;
+  order_id: number;
+  amount: string;
+  paid_at: string;
+  note: string | null;
+  created_at: string;
+}
+
 export interface OrderSummary {
   id: number;
   number: number;
@@ -84,6 +93,8 @@ export interface OrderSummary {
 export interface Order extends OrderSummary {
   items: OrderItem[];
   status_history: OrderStatusHistory[];
+  payments: OrderPayment[];
+  paid_amount: string;
   updated_at: string;
 }
 

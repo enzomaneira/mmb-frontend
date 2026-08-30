@@ -33,6 +33,12 @@ export function StatusPage() {
   const [changedAt, setChangedAt] = useState("");   // optional manual date
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // payment form state
+  const [payAmount, setPayAmount] = useState("");
+  const [payDate, setPayDate] = useState("");
+  const [payNote, setPayNote] = useState("");
+  const [payError, setPayError] = useState("");
+
   const orders = useQuery({
     queryKey: ["orders", sortBy, sortOrder],
     queryFn: () => api.orders.list({ sort_by: sortBy, sort_order: sortOrder }),
@@ -59,6 +65,41 @@ export function StatusPage() {
       queryClient.invalidateQueries({ queryKey: ["revenue"] });
       setMessage({ type: "success", text: "Status atualizado com sucesso!" });
       setChangedAt("");
+    },
+    onError: (err: Error) => {
+      setMessage({ type: "error", text: err.message });
+    },
+  });
+
+  // payment mutations
+  const addPaymentMutation = useMutation({
+    mutationFn: () =>
+      api.payments.create(selectedOrderId!, {
+        amount: Number(payAmount),
+        paid_at: payDate ? `${payDate}T12:00:00` : undefined,
+        note: payNote || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      setPayAmount("");
+      setPayDate("");
+      setPayNote("");
+      setPayError("");
+      setMessage({ type: "success", text: "Pagamento registrado!" });
+    },
+    onError: (err: Error) => {
+      setPayError(err.message);
+    },
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: (paymentId: number) =>
+      api.payments.delete(selectedOrderId!, paymentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      setMessage({ type: "success", text: "Pagamento removido." });
     },
     onError: (err: Error) => {
       setMessage({ type: "error", text: err.message });
@@ -225,6 +266,116 @@ export function StatusPage() {
               <div className="flex gap-2 text-sm">
                 <span className="text-gray-500">Total:</span>
                 <strong>{formatCurrency(selectedOrder.total)}</strong>
+              </div>
+
+              {/* Payments section */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-600">Pagamentos</h4>
+
+                {/* Existing payments list */}
+                {selectedOrder.payments.length > 0 && (
+                  <ul className="space-y-1.5">
+                    {selectedOrder.payments.map((pay) => (
+                      <li
+                        key={pay.id}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-semibold text-green-700">
+                            {formatCurrency(pay.amount)}
+                          </span>
+                          <span className="ml-2 text-xs text-gray-500">
+                            {formatDate(pay.paid_at)}
+                          </span>
+                          {pay.note && (
+                            <span className="ml-1 truncate text-xs text-gray-400">
+                              · {pay.note}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => deletePaymentMutation.mutate(pay.id)}
+                          className="shrink-0 rounded p-1 text-gray-400 transition hover:bg-red-100 hover:text-red-500"
+                          title="Remover pagamento"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Payment summary */}
+                <div className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 text-sm">
+                  <span className="text-gray-500">Total pago:</span>
+                  <span className="font-bold text-green-700">
+                    {formatCurrency(selectedOrder.paid_amount)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-brand-pink/5 px-3 py-2 text-sm">
+                  <span className="text-gray-500">Saldo devedor:</span>
+                  <span
+                    className={`font-bold ${
+                      parseFloat(selectedOrder.paid_amount) >= parseFloat(selectedOrder.total)
+                        ? "text-green-600"
+                        : "text-brand-pink-deep"
+                    }`}
+                  >
+                    {formatCurrency(
+                      parseFloat(selectedOrder.total) - parseFloat(selectedOrder.paid_amount),
+                    )}
+                  </span>
+                </div>
+
+                {/* Add payment form */}
+                <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input
+                      label="Valor (R$)"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="0,00"
+                      value={payAmount}
+                      error={payError}
+                      onChange={(e) => {
+                        setPayAmount(e.target.value.replace(/[^0-9.]/g, ""));
+                        if (payError) setPayError("");
+                      }}
+                    />
+                    <Input
+                      label="Data (opcional)"
+                      type="date"
+                      value={payDate}
+                      onChange={(e) => setPayDate(e.target.value)}
+                      hint="Em branco = hoje"
+                    />
+                  </div>
+                  <Input
+                    label="Observação (opcional)"
+                    type="text"
+                    placeholder="Ex: Sinal, Parcela 1..."
+                    value={payNote}
+                    onChange={(e) => setPayNote(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full py-2 text-sm"
+                    loading={addPaymentMutation.isPending}
+                    disabled={!payAmount || Number(payAmount) <= 0}
+                    onClick={() => {
+                      if (!payAmount || Number(payAmount) <= 0) {
+                        setPayError("Informe um valor válido");
+                        return;
+                      }
+                      addPaymentMutation.mutate();
+                    }}
+                  >
+                    💰 Registrar pagamento
+                  </Button>
+                </div>
               </div>
 
               <Select
