@@ -261,6 +261,15 @@ export function ChartsPage() {
 
   // ── Filters: "Top produtos" ──
   const [top_limit, setTopLimit]           = useState(8);
+  const [top_startDate, setTopStartDate]   = useState("");
+  const [top_endDate, setTopEndDate]       = useState("");
+  const [top_year, setTopYear]             = useState("");
+  const [top_month, setTopMonth]           = useState("");
+
+  // ── Filters: "Tempo de produção" ──
+  const [pt_productId, setPtProductId]   = useState("");
+  const [pt_startDate, setPtStartDate]   = useState("");
+  const [pt_endDate, setPtEndDate]       = useState("");
 
   // ── Filters: "Vendas totais no período" ──
   const [ts_granularity, setTsGranularity] = useState<"day" | "month" | "year">("month");
@@ -284,6 +293,7 @@ export function ChartsPage() {
   const [typeRevenueShare, setTypeRevenueShare]   = useState<ChartType>("pie");
   const [typeTotalSales, setTypeTotalSales]       = useState<ChartType>("bar");
   const [typeMonthly, setTypeMonthly]             = useState<ChartType>("area");
+  const [typeProductionTime, setTypeProductionTime] = useState<ChartType>("bar");
 
   // Expanded modal
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
@@ -316,8 +326,28 @@ export function ChartsPage() {
   });
 
   const topProducts = useQuery({
-    queryKey: ["chart-top", top_limit, segType],
-    queryFn: () => api.charts.topProducts(top_limit, segType),
+    queryKey: ["chart-top", top_limit, segType, top_startDate, top_endDate, top_year, top_month],
+    queryFn: () => {
+      // If year/month quick-filters are set, derive start/end dates from them
+      let startDate = top_startDate;
+      let endDate = top_endDate;
+      if (top_year) {
+        if (top_month) {
+          startDate = `${top_year}-${String(top_month).padStart(2, "0")}-01`;
+          const lastDay = new Date(Number(top_year), Number(top_month), 0).getDate();
+          endDate = `${top_year}-${String(top_month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        } else {
+          startDate = `${top_year}-01-01`;
+          endDate = `${top_year}-12-31`;
+        }
+      }
+      return api.charts.topProducts({
+        limit: top_limit,
+        product_type: segType,
+        start_date: startDate ? `${startDate}T00:00:00` : undefined,
+        end_date: endDate ? `${endDate}T23:59:59` : undefined,
+      });
+    },
   });
 
   const totalSales = useQuery({
@@ -328,6 +358,15 @@ export function ChartsPage() {
       end_date:   ts_endDate   ? `${ts_endDate}T23:59:59`   : undefined,
       product_type: segType,
       product_id: segProductId,
+    }),
+  });
+
+  const productionTime = useQuery({
+    queryKey: ["chart-prod-time", pt_productId, pt_startDate, pt_endDate],
+    queryFn: () => api.charts.productionTime({
+      product_id: pt_productId ? Number(pt_productId) : undefined,
+      start_date: pt_startDate ? `${pt_startDate}T00:00:00` : undefined,
+      end_date:   pt_endDate   ? `${pt_endDate}T23:59:59`   : undefined,
     }),
   });
 
@@ -385,6 +424,11 @@ export function ChartsPage() {
   const topData = (topProducts.data ?? []).map((d) => ({ product_name: d.product_name, units_sold: d.units_sold, revenue: parseFloat(d.revenue) }));
   const totalData = (totalSales.data ?? []).map((d) => ({ date: d.date, value: parseFloat(d.value) }));
   const monthlyData = (revenueChart.data ?? []).map((d) => ({ period: d.period, value: parseFloat(d.value) }));
+  const productionTimeData = (productionTime.data ?? []).slice(0, 30).map((d) => ({
+    label: `#${d.order_number}`,
+    production_days: d.production_days,
+    product_name: d.product_name ?? "",
+  }));
   const shareData = (revenueShare.data ?? []).map((d) => ({
     product_name: d.product_name, percentage: parseFloat(d.percentage), revenue: parseFloat(d.revenue),
   }));
@@ -446,18 +490,46 @@ export function ChartsPage() {
     },
     {
       id: "top-products",
-      title: `Produtos mais vendidos (qtd.)${segType ? ` — ${PRODUCT_TYPE_LABELS[segType]}` : ""}`,
+      title: `Produtos mais vendidos (qtd.)${segType ? ` — ${PRODUCT_TYPE_LABELS[segType]}` : ""}${top_year ? ` — ${top_year}${top_month ? `/${monthOptions.find(m => m.value === top_month)?.label ?? ""}` : ""}` : (top_startDate || top_endDate) ? " — período personalizado" : ""}`,
       type: typeTopProducts, setType: setTypeTopProducts,
       data: topData, dataKey: "units_sold", nameKey: "product_name",
       disablePie: false, disableRadar: false, angleLabel: true,
       filters: (
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Top produtos (quantidade)</label>
-          <input type="range" min={3} max={20} value={top_limit}
-            onChange={(e) => setTopLimit(Number(e.target.value))}
-            className="accent-brand-pink-deep" />
-          <span className="text-xs text-gray-500">Top {top_limit}</span>
-        </div>
+        <>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Top produtos (quantidade)</label>
+            <input type="range" min={3} max={20} value={top_limit}
+              onChange={(e) => setTopLimit(Number(e.target.value))}
+              className="accent-brand-pink-deep" />
+            <span className="text-xs text-gray-500">Top {top_limit}</span>
+          </div>
+          <Input label="Ano" type="number" placeholder="ex: 2024" value={top_year}
+            onChange={(e) => { setTopYear(e.target.value); setTopStartDate(""); setTopEndDate(""); }} />
+          <Select label="Mês (opcional)" value={top_month}
+            onChange={(e) => setTopMonth(e.target.value)} options={monthOptions} />
+          <Input label="Data início (personalizado)" type="date" value={top_startDate}
+            onChange={(e) => { setTopStartDate(e.target.value); setTopYear(""); setTopMonth(""); }} />
+          <Input label="Data fim (personalizado)" type="date" value={top_endDate}
+            onChange={(e) => { setTopEndDate(e.target.value); setTopYear(""); setTopMonth(""); }} />
+        </>
+      ),
+    },
+    {
+      id: "production-time",
+      title: `Tempo de produção (dias)${pt_productId ? ` — ${filteredProducts.find(p => String(p.id) === pt_productId)?.name ?? ""}` : ""}${pt_startDate || pt_endDate ? " — período filtrado" : ""}`,
+      type: typeProductionTime, setType: setTypeProductionTime,
+      data: productionTimeData, dataKey: "production_days", nameKey: "label",
+      disablePie: true, disableRadar: true, angleLabel: true,
+      formatter: (v: number) => `${v.toFixed(1)} dias`,
+      filters: (
+        <>
+          <Select label="Produto" value={pt_productId}
+            onChange={(e) => setPtProductId(e.target.value)} options={productOptions} />
+          <Input label="Data início" type="date" value={pt_startDate}
+            onChange={(e) => setPtStartDate(e.target.value)} />
+          <Input label="Data fim" type="date" value={pt_endDate}
+            onChange={(e) => setPtEndDate(e.target.value)} />
+        </>
       ),
     },
     {

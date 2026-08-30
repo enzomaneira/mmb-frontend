@@ -122,6 +122,14 @@ export interface TopProduct {
   revenue: string;
 }
 
+export interface TopCustomer {
+  customer_id: number;
+  customer_number: number;
+  customer_name: string;
+  total_spent: string;
+  total_orders: number;
+}
+
 export interface ProductRevenueShare {
   product_id: number;
   product_number: number;
@@ -133,6 +141,22 @@ export interface ProductRevenueShare {
 export interface RevenueChartPoint {
   period: string;
   value: string;
+}
+
+export interface ProductionTimeItem {
+  order_id: number;
+  order_number: number;
+  product_id: number | null;
+  product_name: string | null;
+  started_at: string;
+  completed_at: string;
+  production_days: number;
+}
+
+export interface AvgProductionTimeItem {
+  year: number;
+  avg_days: number;
+  order_count: number;
 }
 
 export const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {

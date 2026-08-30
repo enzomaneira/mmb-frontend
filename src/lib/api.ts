@@ -1,4 +1,5 @@
 import type {
+  AvgProductionTimeItem,
   ChartPoint,
   Customer,
   CustomerWithOrders,
@@ -6,12 +7,14 @@ import type {
   Order,
   OrderPayment,
   OrderStatus,
+  ProductionTimeItem,
   Product,
   ProductRevenueShare,
   ProductSalesPoint,
   ProductType,
   RevenueChartPoint,
   SortOrder,
+  TopCustomer,
   TopProduct,
 } from "../types";
 
@@ -294,9 +297,19 @@ export const api = {
     }) =>
       request<ChartPoint[]>(`/charts/sales-by-customer${buildQuery(params)}`),
 
-    topProducts: (limit = 10, product_type?: ProductType) =>
+    topProducts: (params?: {
+      limit?: number;
+      product_type?: ProductType;
+      start_date?: string;
+      end_date?: string;
+    }) =>
       request<TopProduct[]>(
-        `/charts/top-products?limit=${limit}${product_type ? `&product_type=${product_type}` : ""}`,
+        `/charts/top-products${buildQuery({
+          limit: params?.limit ?? 10,
+          product_type: params?.product_type,
+          start_date: params?.start_date,
+          end_date: params?.end_date,
+        })}`,
       ),
 
     totalSales: (params?: {
@@ -311,6 +324,28 @@ export const api = {
     productRevenueShare: (product_type?: ProductType) =>
       request<ProductRevenueShare[]>(
         `/charts/product-revenue-share${product_type ? `?product_type=${product_type}` : ""}`,
+      ),
+
+    topCustomers: (params?: { limit?: number; year?: number }) =>
+      request<TopCustomer[]>(
+        `/charts/top-customers${buildQuery({
+          limit: params?.limit,
+          year: params?.year,
+        })}`,
+      ),
+
+    productionTime: (params?: {
+      product_id?: number;
+      start_date?: string;
+      end_date?: string;
+    }) =>
+      request<ProductionTimeItem[]>(
+        `/charts/production-time${buildQuery(params ?? {})}`,
+      ),
+
+    avgProductionTime: () =>
+      request<AvgProductionTimeItem[]>(
+        `/charts/avg-production-time`,
       ),
   },
 };

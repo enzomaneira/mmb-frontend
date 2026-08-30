@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import { api } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/format";
-import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, type OrderStatus } from "../types";
+import { AvgProductionTimeItem, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, type OrderStatus } from "../types";
 import { StatusBadge } from "../components/ui/StatusBadge";
 
 const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -93,10 +93,30 @@ export function Dashboard() {
     });
   }, [revenueChart.data, selectedYear]);
 
-  // Top customers by spent
-  const topCustomers = [...(customers.data ?? [])]
-    .sort((a, b) => parseFloat(b.total_spent) - parseFloat(a.total_spent))
-    .slice(0, 5);
+  // ── Top customers with year filter ────────────────────────────────────────
+  const [topCustomersYear, setTopCustomersYear] = useState<string>("all");
+
+  // Extract available years from revenue chart data
+  const topCustomersYears = useMemo(() => {
+    const years = new Set(
+      (revenueChart.data ?? []).map((d) => d.period.slice(0, 4))
+    );
+    return Array.from(years).sort().reverse();
+  }, [revenueChart.data]);
+
+  const topCustomersQuery = useQuery({
+    queryKey: ["top-customers", topCustomersYear],
+    queryFn: () => api.charts.topCustomers({
+      limit: 10,
+      year: topCustomersYear !== "all" ? Number(topCustomersYear) : undefined,
+    }),
+  });
+
+  // ── Average production time by year ────────────────────────────────────────
+  const avgProductionTimeQuery = useQuery({
+    queryKey: ["avg-production-time"],
+    queryFn: () => api.charts.avgProductionTime(),
+  });
 
   // Revenue this month
   const now = new Date();
@@ -291,29 +311,74 @@ export function Dashboard() {
 
           {/* Top customers */}
           <div className="section-card">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="font-semibold text-brand-pink-deep">🏆 Top clientes</h3>
-              <Link to="/busca/clientes" className="text-xs text-brand-pink-deep hover:underline">Ver todos →</Link>
+              {topCustomersYears.length > 0 && (
+                <select
+                  value={topCustomersYear}
+                  onChange={(e) => setTopCustomersYear(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
+                >
+                  <option value="all">Todos os anos</option>
+                  {topCustomersYears.map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <ul className="space-y-2">
-              {topCustomers.map((c, i) => (
-                <li key={c.id} className="flex items-center gap-2 text-sm">
+              {(topCustomersQuery.data ?? []).map((c, i) => (
+                <li key={c.customer_id} className="flex items-center gap-2 text-sm">
                   <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                     i === 0 ? "bg-yellow-300 text-yellow-900" :
                     i === 1 ? "bg-gray-200 text-gray-700" :
                     i === 2 ? "bg-amber-100 text-amber-800" :
                     "bg-gray-50 text-gray-500"
                   }`}>{i + 1}</span>
-                  <span className="flex-1 truncate font-medium">{c.name}</span>
+                  <span className="flex-1 truncate font-medium">{c.customer_name}</span>
                   <span className="shrink-0 font-semibold text-brand-pink-deep">{formatCurrency(c.total_spent)}</span>
                 </li>
               ))}
-              {topCustomers.length === 0 && (
+              {(topCustomersQuery.data ?? []).length === 0 && (
                 <p className="text-sm text-gray-400">Sem dados ainda</p>
               )}
             </ul>
           </div>
         </div>
+      </div>
+
+      {/* Average production time by year */}
+      <div className="section-card">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-brand-pink-deep">⏱️ Tempo médio de produção (dias)</h3>
+          <span className="text-xs text-gray-400">Diferença entre “Em andamento” e “Pronto”</span>
+        </div>
+        {avgProductionTimeQuery.data && avgProductionTimeQuery.data.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs font-semibold text-gray-400">
+                  <th className="pb-2 pr-4">Ano</th>
+                  <th className="pb-2 pr-4">Tempo médio (dias)</th>
+                  <th className="pb-2">Pedidos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(avgProductionTimeQuery.data as AvgProductionTimeItem[]).map((item) => (
+                  <tr key={item.year} className="border-b border-gray-50">
+                    <td className="py-2 pr-4 font-semibold">{item.year}</td>
+                    <td className="py-2 pr-4">{item.avg_days.toFixed(1)} dias</td>
+                    <td className="py-2 text-gray-600">{item.order_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex h-[120px] items-center justify-center text-sm text-gray-400">
+            Sem dados de produção ainda
+          </div>
+        )}
       </div>
 
       {/* Quick access */}
