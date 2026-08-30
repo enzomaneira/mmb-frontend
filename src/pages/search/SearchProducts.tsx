@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../lib/api";
-import { formatCurrency, formatDate } from "../../lib/format";
+import { formatCurrency, formatDate, toInputDate } from "../../lib/format";
 import { PRODUCT_TYPE_LABELS, type Product, type ProductType, type SortOrder } from "../../types";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -26,13 +26,6 @@ const filterTypeOptions = [
   { value: "", label: "Todos os tipos" },
   ...Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
 ];
-
-// Convert ISO datetime string to YYYY-MM-DD for date inputs
-function toDateInput(iso: string | Date | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export function SearchProducts() {
   const queryClient = useQueryClient();
@@ -138,7 +131,7 @@ export function SearchProducts() {
       product_type: p.product_type,
       price: p.price,
       stock_quantity: String(p.stock_quantity),
-      created_at: toDateInput(p.created_at),
+      created_at: toInputDate(p.created_at),
     });
     setErrors({});
     setMode("edit");

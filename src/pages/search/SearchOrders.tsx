@@ -1,7 +1,7 @@
-﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+﻿﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../lib/api";
-import { formatCurrency, formatDate } from "../../lib/format";
+import { formatCurrency, formatDate, toInputDate } from "../../lib/format";
 import {
   ORDER_STATUS_LABELS, ORDER_STATUS_COLORS,
   type Order, type OrderStatus, type SortOrder
@@ -26,12 +26,6 @@ function newEditItem(): ItemForm {
 }
 
 const ALL_STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
-
-function toDateInput(iso: string | Date | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export function SearchOrders() {
   const queryClient = useQueryClient();
@@ -132,7 +126,7 @@ export function SearchOrders() {
     setSelected(order);
     setEditCustomerId(String(order.customer_id));
     setEditCustomerSearch(customerMap.get(order.customer_id)?.name ?? "");
-    setEditCreatedAt(toDateInput(order.created_at));
+    setEditCreatedAt(toInputDate(order.created_at));
     setEditCreatedAtError("");
     setEditActiveTab(0);
     setEditItems(order.items.map((item) => ({

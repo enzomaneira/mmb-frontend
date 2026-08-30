@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../lib/api";
-import { formatCurrency, formatDate } from "../../lib/format";
+import { formatCurrency, formatDate, toInputDate } from "../../lib/format";
 import type { Customer, SortOrder } from "../../types";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -10,13 +10,6 @@ import { Select } from "../../components/ui/Select";
 import { SortToggle } from "../../components/ui/SortToggle";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Modal } from "../../components/ui/Modal";
-
-// Convert ISO datetime string to YYYY-MM-DD for date inputs
-function toDateInput(iso: string | Date | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 // Phone formatting helper (e.g. 11912345678 → (11) 91234-5678)
 function formatPhone(value: string): string {
@@ -122,7 +115,7 @@ export function SearchCustomers() {
       email: c.email ?? "",
       phone: c.phone ? formatPhone(c.phone) : "",
       notes: c.notes ?? "",
-      created_at: toDateInput(c.created_at),
+      created_at: toInputDate(c.created_at),
     });
     setErrors({});
     setMode("edit");
