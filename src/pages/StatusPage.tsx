@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/format";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, type OrderStatus } from "../types";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, type OrderStatus, type SortOrder } from "../types";
 import { Alert } from "../components/ui/Alert";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
+import { SortToggle } from "../components/ui/SortToggle";
 import { StatusBadge } from "../components/ui/StatusBadge";
 
 const ALL_STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
@@ -23,6 +24,8 @@ export function StatusPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<OrderStatus | "">("");
   const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [sortBy, setSortBy] = useState("created_at");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   // right panel state
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -31,8 +34,8 @@ export function StatusPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const orders = useQuery({
-    queryKey: ["orders"],
-    queryFn: () => api.orders.list({ sort_by: "created_at", sort_order: "desc" }),
+    queryKey: ["orders", sortBy, sortOrder],
+    queryFn: () => api.orders.list({ sort_by: sortBy, sort_order: sortOrder }),
   });
 
   const customers = useQuery({
@@ -88,7 +91,22 @@ export function StatusPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left panel — order list */}
         <div className="section-card space-y-4">
-          <h3 className="font-semibold text-brand-pink-deep">Pedidos</h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-semibold text-brand-pink-deep">Pedidos</h3>
+            <div className="flex items-center gap-2">
+              <Select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                options={[
+                  { value: "created_at", label: "Data" },
+                  { value: "total", label: "Total" },
+                  { value: "number", label: "Número" },
+                  { value: "status", label: "Status" },
+                ]}
+              />
+              <SortToggle value={sortOrder} onChange={setSortOrder} />
+            </div>
+          </div>
 
           {/* Filters */}
           <div className="space-y-2">
