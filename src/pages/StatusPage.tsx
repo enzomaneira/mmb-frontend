@@ -182,6 +182,28 @@ export function StatusPage() {
                 </div>
               )}
 
+              {/* Products */}
+              {selectedOrder.items.length > 0 && (
+                <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm">
+                  <p className="mb-2 text-xs font-medium text-gray-400">Produtos</p>
+                  <ul className="space-y-1.5">
+                    {selectedOrder.items.map((item) => (
+                      <li key={item.id} className="flex items-center justify-between gap-2">
+                        <span className="truncate font-medium text-gray-700">
+                          {item.product_name
+                            ? `#${item.product_number} — ${item.product_name}`
+                            : `Produto #${item.product_id}`}
+                          <span className="ml-1 text-gray-400">×{item.quantity}</span>
+                        </span>
+                        <span className="shrink-0 text-gray-500">
+                          {formatCurrency(item.unit_price)} → <strong>{formatCurrency(item.subtotal)}</strong>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="flex gap-2 text-sm">
                 <span className="text-gray-500">Total:</span>
                 <strong>{formatCurrency(selectedOrder.total)}</strong>
