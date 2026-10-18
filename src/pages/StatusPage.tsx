@@ -381,7 +381,13 @@ export function StatusPage() {
               <Select
                 label="Novo status"
                 value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value as OrderStatus)}
+                onChange={(e) => {
+                  const status = e.target.value as OrderStatus;
+                  setNewStatus(status);
+                  // Payment usually happens on delivery: suggest that date (still editable)
+                  const delivered = selectedOrder.status_history.find((h) => h.status === "DELIVERED");
+                  setChangedAt(status === "PAID" && delivered ? delivered.changed_at.slice(0, 10) : "");
+                }}
                 options={statusOptions}
               />
 
