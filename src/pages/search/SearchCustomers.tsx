@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../lib/api";
 import { formatCurrency, formatDate, toInputDate } from "../../lib/format";
+import { useIsPhone } from "../../lib/useMediaQuery";
 import type { Customer, SortOrder } from "../../types";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -10,6 +11,7 @@ import { Select } from "../../components/ui/Select";
 import { SortToggle } from "../../components/ui/SortToggle";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Modal } from "../../components/ui/Modal";
+import { MobileCards } from "../../components/ui/MobileCards";
 
 // Phone formatting helper (e.g. 11912345678 → (11) 91234-5678)
 function formatPhone(value: string): string {
@@ -21,6 +23,7 @@ function formatPhone(value: string): string {
 }
 
 export function SearchCustomers() {
+  const isPhone = useIsPhone();
   const queryClient = useQueryClient();
 
   // ─── List filters ────────────────────────────────────────────────────────────
@@ -168,7 +171,7 @@ export function SearchCustomers() {
       </div>
 
       {/* Primary search row */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="filter-grid filter-grid-lead flex flex-wrap items-end gap-3">
         <Input label="Buscar (nome, e-mail, telefone)" value={search}
           onChange={(e) => setSearch(e.target.value)} className="min-w-[250px]" placeholder="Digite para buscar..." />
         <Select label="Ordenar por" value={sortBy} onChange={(e) => setSortBy(e.target.value)}
@@ -187,7 +190,7 @@ export function SearchCustomers() {
       {showFilters && (
         <div className="rounded-xl border border-brand-pink/20 bg-brand-pink/5 p-4 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Filtros avançados (aplicados localmente)</p>
-          <div className="flex flex-wrap gap-3">
+          <div className="filter-grid flex flex-wrap gap-3">
             <Input label="Total gasto mín. (R$)" type="number" step="0.01" value={minSpent}
               onChange={(e) => setMinSpent(e.target.value)} className="w-40" />
             <Input label="Total gasto máx. (R$)" type="number" step="0.01" value={maxSpent}
@@ -210,33 +213,57 @@ export function SearchCustomers() {
       <p className="text-sm text-gray-500">{filtered.length} cliente{filtered.length !== 1 ? "s" : ""} • Clique para detalhes</p>
 
       <div className="overflow-x-auto rounded-xl border border-brand-pink/30">
-        <table className="w-full text-sm">
-          <thead className="bg-brand-pink/20">
-            <tr>
-              <th className="px-4 py-3 text-left">Nº</th>
-              <th className="px-4 py-3 text-left">Nome</th>
-              <th className="px-4 py-3 text-left">Telefone</th>
-              <th className="px-4 py-3 text-left">E-mail</th>
-              <th className="px-4 py-3 text-left">Pedidos</th>
-              <th className="px-4 py-3 text-left">Total gasto</th>
-              <th className="px-4 py-3 text-left">Unidades</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((c) => (
-              <tr key={c.id} onClick={() => openView(c)}
-                className="cursor-pointer border-t border-gray-100 hover:bg-brand-pink/10 transition">
-                <td className="px-4 py-3 font-mono text-xs text-gray-500">#{c.number}</td>
-                <td className="px-4 py-3 font-medium">{c.name}</td>
-                <td className="px-4 py-3 text-gray-600">{c.phone ?? "—"}</td>
-                <td className="px-4 py-3 text-gray-600">{c.email ?? "—"}</td>
-                <td className="px-4 py-3">{c.total_orders}</td>
-                <td className="px-4 py-3 font-semibold text-brand-pink-deep">{formatCurrency(c.total_spent)}</td>
-                <td className="px-4 py-3">{c.total_units}</td>
+        {isPhone ? (
+          <MobileCards
+            items={filtered}
+            getKey={(c) => c.id}
+            onSelect={openView}
+            renderCard={(c) => (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate font-semibold">{c.name}</span>
+                  <span className="shrink-0 font-semibold text-brand-pink-deep">{formatCurrency(c.total_spent)}</span>
+                </div>
+                <p className="mt-1 truncate text-sm text-gray-500">
+                  #{c.number}
+                  {c.phone ? ` · ${c.phone}` : ""}
+                  {c.email ? ` · ${c.email}` : ""}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-400">
+                  {c.total_orders} pedido{c.total_orders !== 1 ? "s" : ""} · {c.total_units} unidade{c.total_units !== 1 ? "s" : ""}
+                </p>
+              </>
+            )}
+          />
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-brand-pink/20">
+              <tr>
+                <th className="px-4 py-3 text-left">Nº</th>
+                <th className="px-4 py-3 text-left">Nome</th>
+                <th className="px-4 py-3 text-left">Telefone</th>
+                <th className="px-4 py-3 text-left">E-mail</th>
+                <th className="px-4 py-3 text-left">Pedidos</th>
+                <th className="px-4 py-3 text-left">Total gasto</th>
+                <th className="px-4 py-3 text-left">Unidades</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((c) => (
+                <tr key={c.id} onClick={() => openView(c)}
+                  className="cursor-pointer border-t border-gray-100 hover:bg-brand-pink/10 transition">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500">#{c.number}</td>
+                  <td className="px-4 py-3 font-medium">{c.name}</td>
+                  <td className="px-4 py-3 text-gray-600">{c.phone ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600">{c.email ?? "—"}</td>
+                  <td className="px-4 py-3">{c.total_orders}</td>
+                  <td className="px-4 py-3 font-semibold text-brand-pink-deep">{formatCurrency(c.total_spent)}</td>
+                  <td className="px-4 py-3">{c.total_units}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         {listQuery.isLoading && <p className="p-4 text-center text-sm text-gray-400">Carregando...</p>}
         {!listQuery.isLoading && filtered.length === 0 && (
           <p className="p-4 text-center text-sm text-gray-400">Nenhum cliente encontrado.</p>
@@ -260,15 +287,15 @@ export function SearchCustomers() {
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-xl bg-brand-pink/10 p-3 text-center">
                 <p className="text-xs text-gray-500">Pedidos pagos</p>
-                <p className="text-2xl font-bold text-brand-pink-deep">{selected.total_orders}</p>
+                <p className="text-2xl font-bold text-brand-pink-deep max-md:text-lg">{selected.total_orders}</p>
               </div>
               <div className="rounded-xl bg-brand-yellow/30 p-3 text-center">
                 <p className="text-xs text-gray-500">Total gasto</p>
-                <p className="text-xl font-bold text-yellow-800">{formatCurrency(selected.total_spent)}</p>
+                <p className="text-xl font-bold text-yellow-800 max-md:text-sm max-md:leading-7">{formatCurrency(selected.total_spent)}</p>
               </div>
               <div className="rounded-xl bg-green-50 p-3 text-center">
                 <p className="text-xs text-gray-500">Unidades</p>
-                <p className="text-2xl font-bold text-green-700">{selected.total_units}</p>
+                <p className="text-2xl font-bold text-green-700 max-md:text-lg">{selected.total_units}</p>
               </div>
             </div>
 

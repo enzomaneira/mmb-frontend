@@ -111,7 +111,7 @@ export function RegisterCustomer() {
         )}
 
         {/* Card: Dados básicos */}
-        <div className="mb-5 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card">
+        <div className="mb-5 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card max-md:p-4">
           <div className="mb-5 flex items-center gap-2 border-b border-brand-pink/10 pb-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-pink/20 text-base">👤</span>
             <h4 className="font-semibold text-brand-pink-deep">Dados básicos</h4>
@@ -185,7 +185,7 @@ export function RegisterCustomer() {
         </div>
 
         {/* Card: Contato */}
-        <div className="mb-5 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card">
+        <div className="mb-5 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card max-md:p-4">
           <div className="mb-5 flex items-center gap-2 border-b border-brand-pink/10 pb-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-yellow/40 text-base">📞</span>
             <h4 className="font-semibold text-brand-pink-deep">Contato</h4>
@@ -229,7 +229,7 @@ export function RegisterCustomer() {
         </div>
 
         {/* Card: Observações */}
-        <div className="mb-6 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card">
+        <div className="mb-6 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card max-md:p-4">
           <div className="mb-5 flex items-center gap-2 border-b border-brand-pink/10 pb-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-base">📝</span>
             <h4 className="font-semibold text-brand-pink-deep">Observações</h4>

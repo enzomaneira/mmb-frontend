@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/format";
+import { useIsCompact } from "../lib/useMediaQuery";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, type OrderStatus, type SortOrder } from "../types";
 import { Alert } from "../components/ui/Alert";
 import { Button } from "../components/ui/Button";
@@ -12,6 +13,8 @@ import { StatusBadge } from "../components/ui/StatusBadge";
 
 const ALL_STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
 
+const COMPACT_PAGE_SIZE = 40;
+
 const statusOptions = ALL_STATUSES.map((value) => ({
   value,
   label: ORDER_STATUS_LABELS[value],
@@ -19,6 +22,9 @@ const statusOptions = ALL_STATUSES.map((value) => ({
 
 export function StatusPage() {
   const queryClient = useQueryClient();
+  const isCompact = useIsCompact();
+  const [compactLimit, setCompactLimit] = useState(COMPACT_PAGE_SIZE);
+  const listScrollY = useRef(0);
 
   // left panel filters
   const [search, setSearch] = useState("");
@@ -121,18 +127,29 @@ export function StatusPage() {
     return true;
   });
 
+  const visibleOrders = isCompact ? filtered.slice(0, compactLimit) : filtered;
+
+  // Em telas compactas a lista e os detalhes se alternam: guarda a posição da lista
+  const backToList = () => {
+    setSelectedOrderId(null);
+    setMessage(null);
+    requestAnimationFrame(() => window.scrollTo(0, listScrollY.current));
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="page-title">Gerenciar status dos pedidos</h2>
 
       {message && (
-        <Alert type={message.type} message={message.text} onClose={() => setMessage(null)} />
+        <div className="max-lg:sticky max-lg:top-2 max-lg:z-20">
+          <Alert type={message.type} message={message.text} onClose={() => setMessage(null)} />
+        </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left panel — order list */}
-        <div className="section-card space-y-4">
-          <div className="flex items-center justify-between gap-2">
+        <div className={`section-card space-y-4 ${selectedOrder ? "max-lg:hidden" : ""}`}>
+          <div className="flex items-center justify-between gap-2 max-md:flex-wrap">
             <h3 className="font-semibold text-brand-pink-deep">Pedidos</h3>
             <div className="flex items-center gap-2">
               <Select
@@ -184,12 +201,16 @@ export function StatusPage() {
             {filtered.length} pedido{filtered.length !== 1 ? "s" : ""}
           </p>
 
-          <div className="max-h-[460px] space-y-2 overflow-y-auto pr-1">
-            {filtered.map((order) => (
+          <div className="max-h-[460px] space-y-2 overflow-y-auto pr-1 max-lg:max-h-none max-lg:overflow-visible max-lg:pr-0">
+            {visibleOrders.map((order) => (
               <button
                 key={order.id}
                 type="button"
                 onClick={() => {
+                  if (isCompact) {
+                    listScrollY.current = window.scrollY;
+                    window.scrollTo(0, 0);
+                  }
                   setSelectedOrderId(order.id);
                   setNewStatus(order.status);
                   setChangedAt("");
@@ -220,13 +241,29 @@ export function StatusPage() {
                 Nenhum pedido encontrado.
               </p>
             )}
+            {visibleOrders.length < filtered.length && (
+              <button
+                type="button"
+                onClick={() => setCompactLimit((l) => l + COMPACT_PAGE_SIZE)}
+                className="w-full rounded-xl border border-gray-200 py-3 text-sm font-semibold text-brand-pink-deep active:bg-brand-pink/10"
+              >
+                Mostrar mais ({filtered.length - visibleOrders.length} restantes)
+              </button>
+            )}
           </div>
         </div>
 
         {/* Right panel — update status */}
-        <div className="section-card">
+        <div className={`section-card ${selectedOrder ? "" : "max-lg:hidden"}`}>
           {selectedOrder ? (
             <div className="space-y-4">
+              <button
+                type="button"
+                onClick={backToList}
+                className="-ml-1 rounded-lg px-1 py-2 text-sm font-semibold text-brand-pink-deep active:bg-brand-pink/10 lg:hidden"
+              >
+                ← Voltar para a lista
+              </button>
               <h3 className="font-semibold text-brand-pink-deep">
                 Pedido #{selectedOrder.number}
               </h3>
@@ -247,8 +284,8 @@ export function StatusPage() {
                   <p className="mb-2 text-xs font-medium text-gray-400">Produtos</p>
                   <ul className="space-y-1.5">
                     {selectedOrder.items.map((item) => (
-                      <li key={item.id} className="flex items-center justify-between gap-2">
-                        <span className="truncate font-medium text-gray-700">
+                      <li key={item.id} className="flex items-center justify-between gap-2 max-md:flex-wrap">
+                        <span className="truncate font-medium text-gray-700 max-md:whitespace-normal">
                           {item.product_name
                             ? `#${item.product_number} — ${item.product_name}`
                             : `Produto #${item.product_id}`}

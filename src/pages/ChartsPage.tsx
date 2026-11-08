@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { api } from "../lib/api";
 import { formatCurrency } from "../lib/format";
+import { useIsPhone } from "../lib/useMediaQuery";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Modal } from "../components/ui/Modal";
@@ -111,6 +112,8 @@ function DynamicChart({
   formatter?: (v: number) => string;
   angleLabel?: boolean;
 }) {
+  const isPhone = useIsPhone();
+
   if (!data.length) return <EmptyChart />;
 
   const tooltipFmt = formatter ? (v: number) => formatter(v) : undefined;
@@ -167,7 +170,7 @@ function DynamicChart({
   }
 
   const xAxisProps = angleLabel
-    ? { tick: { fontSize: 10 }, interval: 0, angle: -28, textAnchor: "end" as const, height: 64, tickFormatter: xTickFmt }
+    ? { tick: { fontSize: 10 }, interval: isPhone ? ("preserveStartEnd" as const) : 0, angle: -28, textAnchor: "end" as const, height: 64, tickFormatter: xTickFmt }
     : { tick: { fontSize: 11 }, tickFormatter: xTickFmt };
 
   if (type === "area") {
@@ -245,6 +248,8 @@ function FilterRow({ children }: { children: React.ReactNode }) {
 
 // ─── Main Charts Page ─────────────────────────────────────────────────────────
 export function ChartsPage() {
+  const isPhone = useIsPhone();
+
   // ── Global filters: Segmento + Produto ──
   const [global_segment, setGlobalSegment] = useState<ProductType | "">("");
   const [global_productId, setGlobalProductId] = useState("");
@@ -593,7 +598,7 @@ export function ChartsPage() {
 
       {/* Global filters: Segmento + Produto */}
       <div className="section-card">
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-2 max-md:flex-wrap">
           <span className="text-sm font-semibold text-brand-pink-deep">🔍 Filtro global</span>
           <span className="text-xs text-gray-400">
             Aplica-se a: Top produtos, Vendas totais, Distribuição de receita, Receita mensal,
@@ -719,7 +724,7 @@ export function ChartsPage() {
                 nameKey={expandedDef.nameKey}
                 formatter={expandedDef.formatter}
                 angleLabel={expandedDef.angleLabel}
-                height={460}
+                height={isPhone ? 320 : 460}
               />
             )}
           </div>

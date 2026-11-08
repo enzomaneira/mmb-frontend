@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../lib/api";
 import { formatCurrency, formatDate, toInputDate } from "../../lib/format";
+import { useIsPhone } from "../../lib/useMediaQuery";
 import { PRODUCT_TYPE_LABELS, type Product, type ProductType, type SortOrder } from "../../types";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -9,6 +10,7 @@ import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { SortToggle } from "../../components/ui/SortToggle";
 import { Modal } from "../../components/ui/Modal";
+import { MobileCards } from "../../components/ui/MobileCards";
 
 const PRODUCT_TYPE_ICONS: Record<ProductType, string> = {
   FELT: "🧶", CLOTH: "🪡", CHRISTMAS: "🎄", SCHOOL: "🎒",
@@ -28,6 +30,7 @@ const filterTypeOptions = [
 ];
 
 export function SearchProducts() {
+  const isPhone = useIsPhone();
   const queryClient = useQueryClient();
 
   // ─── List filters ────────────────────────────────────────────────────────────
@@ -196,7 +199,7 @@ export function SearchProducts() {
       </div>
 
       {/* Primary filters */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="filter-grid filter-grid-lead flex flex-wrap items-end gap-3">
         <Input label="Buscar (nome, número)" value={search}
           onChange={(e) => setSearch(e.target.value)} className="min-w-[220px]" placeholder="Digite para buscar..." />
         <Select label="Tipo" value={productType} onChange={(e) => setProductType(e.target.value)} options={filterTypeOptions} />
@@ -215,7 +218,7 @@ export function SearchProducts() {
       {showFilters && (
         <div className="rounded-xl border border-brand-pink/20 bg-brand-pink/5 p-4 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Filtros avançados</p>
-          <div className="flex flex-wrap gap-3">
+          <div className="filter-grid flex flex-wrap gap-3">
             <Input label="Preço mín. (R$)" type="number" step="0.01" min={0} value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)} className="w-36" />
             <Input label="Preço máx. (R$)" type="number" step="0.01" min={0} value={maxPrice}
@@ -241,38 +244,65 @@ export function SearchProducts() {
 
       <p className="text-sm text-gray-500">{filtered.length} produto{filtered.length !== 1 ? "s" : ""} • Clique para detalhes</p>
 
-      <div className="overflow-x-auto rounded-xl border border-brand-pink/30">
-        <table className="w-full text-sm">
-          <thead className="bg-brand-pink/20">
-            <tr>
-              <th className="px-4 py-3 text-left">Nº</th>
-              <th className="px-4 py-3 text-left">Nome</th>
-              <th className="px-4 py-3 text-left">Tipo</th>
-              <th className="px-4 py-3 text-left">Preço</th>
-              <th className="px-4 py-3 text-left">Estoque</th>
-              <th className="px-4 py-3 text-left">Vendidos</th>
-              <th className="px-4 py-3 text-left">Receita</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p) => (
-              <tr key={p.id} onClick={() => openView(p)}
-                className="cursor-pointer border-t border-gray-100 hover:bg-brand-pink/10 transition">
-                <td className="px-4 py-3 font-mono text-xs text-gray-500">#{p.number}</td>
-                <td className="px-4 py-3 font-medium">{p.name}</td>
-                <td className="px-4 py-3 text-gray-600">{PRODUCT_TYPE_LABELS[p.product_type]}</td>
-                <td className="px-4 py-3">{formatCurrency(p.price)}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${stockBadge(p.stock_quantity)}`}>
-                    {p.stock_quantity}
+      <div className="overflow-x-auto rounded-xl border border-brand-pink/30 md:max-lg:[&_td]:px-3 md:max-lg:[&_th]:px-3">
+        {isPhone ? (
+          <MobileCards
+            items={filtered}
+            getKey={(p) => p.id}
+            onSelect={openView}
+            renderCard={(p) => (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate font-semibold">{p.name}</span>
+                  <span className="shrink-0 font-semibold text-brand-pink-deep">{formatCurrency(p.price)}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-2 text-sm">
+                  <span className="min-w-0 truncate text-gray-500">
+                    #{p.number} · {PRODUCT_TYPE_LABELS[p.product_type]}
                   </span>
-                </td>
-                <td className="px-4 py-3">{p.units_sold}</td>
-                <td className="px-4 py-3 font-semibold text-brand-pink-deep">{formatCurrency(p.revenue)}</td>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${stockBadge(p.stock_quantity)}`}>
+                    {p.stock_quantity} em estoque
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-gray-400">
+                  {p.units_sold} vendido{p.units_sold !== 1 ? "s" : ""} · Receita {formatCurrency(p.revenue)}
+                </p>
+              </>
+            )}
+          />
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-brand-pink/20">
+              <tr>
+                <th className="px-4 py-3 text-left">Nº</th>
+                <th className="px-4 py-3 text-left">Nome</th>
+                <th className="px-4 py-3 text-left">Tipo</th>
+                <th className="px-4 py-3 text-left">Preço</th>
+                <th className="px-4 py-3 text-left">Estoque</th>
+                <th className="px-4 py-3 text-left">Vendidos</th>
+                <th className="px-4 py-3 text-left">Receita</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((p) => (
+                <tr key={p.id} onClick={() => openView(p)}
+                  className="cursor-pointer border-t border-gray-100 hover:bg-brand-pink/10 transition">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500">#{p.number}</td>
+                  <td className="px-4 py-3 font-medium">{p.name}</td>
+                  <td className="px-4 py-3 text-gray-600">{PRODUCT_TYPE_LABELS[p.product_type]}</td>
+                  <td className="px-4 py-3">{formatCurrency(p.price)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${stockBadge(p.stock_quantity)}`}>
+                      {p.stock_quantity}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">{p.units_sold}</td>
+                  <td className="px-4 py-3 font-semibold text-brand-pink-deep">{formatCurrency(p.revenue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         {listQuery.isLoading && <p className="p-4 text-center text-sm text-gray-400">Carregando...</p>}
         {!listQuery.isLoading && filtered.length === 0 && (
           <p className="p-4 text-center text-sm text-gray-400">Nenhum produto encontrado.</p>

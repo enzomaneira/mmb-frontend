@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import { api } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/format";
+import { useIsPhone } from "../lib/useMediaQuery";
 import { AvgProductionTimeItem, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS, type OrderStatus } from "../types";
 import { StatusBadge } from "../components/ui/StatusBadge";
 
@@ -29,13 +30,14 @@ function StatCard({
   return (
     <div className="section-card flex flex-col gap-1">
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <p className={`text-2xl font-bold max-sm:text-lg ${color}`}>{value}</p>
       {sub && <p className="text-xs text-gray-500">{sub}</p>}
     </div>
   );
 }
 
 export function Dashboard() {
+  const isPhone = useIsPhone();
   const customers = useQuery({ queryKey: ["customers"], queryFn: () => api.customers.list() });
   const products = useQuery({ queryKey: ["products"], queryFn: () => api.products.list() });
   const orders = useQuery({ queryKey: ["orders"], queryFn: () => api.orders.list({ sort_by: "created_at", sort_order: "desc" }) });
@@ -137,8 +139,8 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <div className="rounded-2xl bg-gradient-to-r from-brand-pink via-brand-pink-dark to-brand-pink-deep p-8 text-white shadow-card">
-        <h2 className="font-display text-3xl font-bold">Bem-vinda, Michelle! 🎀</h2>
+      <div className="rounded-2xl bg-gradient-to-r from-brand-pink via-brand-pink-dark to-brand-pink-deep p-8 text-white shadow-card max-md:p-5">
+        <h2 className="font-display text-3xl font-bold max-md:text-2xl">Bem-vinda, Michelle! 🎀</h2>
         <p className="mt-2 max-w-xl text-white/90">
           Aqui está um resumo da sua loja. Hoje é{" "}
           {new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}.
@@ -159,7 +161,7 @@ export function Dashboard() {
       </div>
 
       {/* Key stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 max-sm:grid-cols-2 max-sm:gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Clientes cadastrados" value={customers.data?.length ?? "—"} sub="Total no sistema" />
         <StatCard label="Produtos cadastrados" value={products.data?.length ?? "—"} sub="Total no catálogo" />
         <StatCard label="Pedidos pagos" value={paidOrders.length} sub={`Ticket médio: ${formatCurrency(avgOrderValue)}`} color="text-green-600" />
@@ -227,7 +229,7 @@ export function Dashboard() {
                 <XAxis
                   dataKey="period"
                   tick={{ fontSize: 10 }}
-                  interval={selectedYear === "all" ? Math.max(0, Math.floor(chartData.length / 12) - 1) : 0}
+                  interval={selectedYear === "all" ? Math.max(0, Math.floor(chartData.length / (isPhone ? 5 : 12)) - 1) : 0}
                   angle={selectedYear === "all" && chartData.length > 24 ? -35 : 0}
                   textAnchor={selectedYear === "all" && chartData.length > 24 ? "end" : "middle"}
                   height={selectedYear === "all" && chartData.length > 24 ? 42 : 24}
@@ -349,7 +351,7 @@ export function Dashboard() {
 
       {/* Average production time by year */}
       <div className="section-card">
-        <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="mb-4 flex items-center justify-between gap-2 max-md:flex-wrap">
           <h3 className="font-semibold text-brand-pink-deep">⏱️ Tempo médio de produção (dias)</h3>
           <span className="text-xs text-gray-400">Diferença entre “Em andamento” e “Pronto”</span>
         </div>
@@ -384,7 +386,7 @@ export function Dashboard() {
       {/* Quick access */}
       <div className="section-card">
         <h3 className="page-title mb-4 text-lg">Acesso rápido</h3>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid gap-3 max-sm:grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
           {shortcuts.map((item) => (
             <Link key={item.to} to={item.to}
               className={`${item.color} rounded-xl px-4 py-3 text-center text-sm font-semibold transition hover:opacity-90 shadow-sm`}>

@@ -1,7 +1,8 @@
-﻿﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../lib/api";
 import { formatCurrency, formatDate, toInputDate } from "../../lib/format";
+import { useIsPhone } from "../../lib/useMediaQuery";
 import {
   ORDER_STATUS_LABELS, ORDER_STATUS_COLORS,
   type Order, type OrderStatus, type SortOrder
@@ -13,6 +14,7 @@ import { Select } from "../../components/ui/Select";
 import { SortToggle } from "../../components/ui/SortToggle";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Modal } from "../../components/ui/Modal";
+import { MobileCards } from "../../components/ui/MobileCards";
 
 interface ItemForm {
   product_id: string;
@@ -29,6 +31,7 @@ const ALL_STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
 
 export function SearchOrders() {
   const queryClient = useQueryClient();
+  const isPhone = useIsPhone();
 
   const [minTotal, setMinTotal] = useState("");
   const [maxTotal, setMaxTotal] = useState("");
@@ -277,7 +280,7 @@ export function SearchOrders() {
       </div>
 
       {/* Primary search row */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="filter-grid filter-grid-lead flex flex-wrap items-end gap-3">
         <Input
           label="Número do pedido"
           value={searchNumber}
@@ -303,7 +306,7 @@ export function SearchOrders() {
       {showFilters && (
         <div className="rounded-xl border border-brand-pink/20 bg-brand-pink/5 p-4 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Filtros avançados</p>
-          <div className="flex flex-wrap gap-3">
+          <div className="filter-grid flex flex-wrap gap-3">
             <Input label="Valor mín. (R$)" type="number" step="0.01" value={minTotal}
               onChange={(e) => setMinTotal(e.target.value)} className="w-36" />
             <Input label="Valor máx. (R$)" type="number" step="0.01" value={maxTotal}
@@ -325,44 +328,68 @@ export function SearchOrders() {
 
       {/* Summary bar */}
       {filtered.length > 0 && (
-        <div className="flex gap-4 rounded-xl bg-gray-50 px-4 py-3 text-sm">
+        <div className="flex gap-4 rounded-xl bg-gray-50 px-4 py-3 text-sm max-md:flex-wrap max-md:gap-x-3 max-md:gap-y-1">
           <span className="text-gray-500">{filtered.length} pedido{filtered.length !== 1 ? "s" : ""}</span>
-          <span className="text-gray-400">|</span>
+          <span className="text-gray-400 max-md:hidden">|</span>
           <span className="font-semibold text-brand-pink-deep">Total: {formatCurrency(totalValue)}</span>
-          <span className="text-gray-400">|</span>
+          <span className="text-gray-400 max-md:hidden">|</span>
           <span className="text-gray-600">Média: {formatCurrency(avgValue)}</span>
         </div>
       )}
 
       <div className="overflow-x-auto rounded-xl border border-brand-pink/30">
-        <table className="w-full text-sm">
-          <thead className="bg-brand-pink/20">
-            <tr>
-              <th className="px-4 py-3 text-left">Nº</th>
-              <th className="px-4 py-3 text-left">Cliente</th>
-              <th className="px-4 py-3 text-left">Data</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Itens</th>
-              <th className="px-4 py-3 text-left">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((o) => (
-              <tr
-                key={o.id}
-                onClick={() => openView(o)}
-                className="cursor-pointer border-t border-gray-100 hover:bg-brand-pink/10 transition"
-              >
-                <td className="px-4 py-3 font-mono text-xs text-gray-500">#{o.number}</td>
-                <td className="px-4 py-3">{customerMap.get(o.customer_id)?.name ?? `Cliente #${o.customer_id}`}</td>
-                <td className="px-4 py-3">{formatDate(o.created_at)}</td>
-                <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
-                <td className="px-4 py-3">{o.items.length}</td>
-                <td className="px-4 py-3 font-semibold text-brand-pink-deep">{formatCurrency(o.total)}</td>
+        {isPhone ? (
+          <MobileCards
+            items={filtered}
+            getKey={(o) => o.id}
+            onSelect={openView}
+            renderCard={(o) => (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate font-semibold">
+                    {customerMap.get(o.customer_id)?.name ?? `Cliente #${o.customer_id}`}
+                  </span>
+                  <StatusBadge status={o.status} />
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-2 text-sm">
+                  <span className="text-gray-500">
+                    #{o.number} · {formatDate(o.created_at)} · {o.items.length} {o.items.length === 1 ? "item" : "itens"}
+                  </span>
+                  <span className="shrink-0 font-semibold text-brand-pink-deep">{formatCurrency(o.total)}</span>
+                </div>
+              </>
+            )}
+          />
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-brand-pink/20">
+              <tr>
+                <th className="px-4 py-3 text-left">Nº</th>
+                <th className="px-4 py-3 text-left">Cliente</th>
+                <th className="px-4 py-3 text-left">Data</th>
+                <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-left">Itens</th>
+                <th className="px-4 py-3 text-left">Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((o) => (
+                <tr
+                  key={o.id}
+                  onClick={() => openView(o)}
+                  className="cursor-pointer border-t border-gray-100 hover:bg-brand-pink/10 transition"
+                >
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500">#{o.number}</td>
+                  <td className="px-4 py-3">{customerMap.get(o.customer_id)?.name ?? `Cliente #${o.customer_id}`}</td>
+                  <td className="px-4 py-3">{formatDate(o.created_at)}</td>
+                  <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
+                  <td className="px-4 py-3">{o.items.length}</td>
+                  <td className="px-4 py-3 font-semibold text-brand-pink-deep">{formatCurrency(o.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         {query.isLoading && <p className="p-4 text-center text-sm text-gray-400">Carregando...</p>}
         {!query.isLoading && filtered.length === 0 && (
           <p className="p-4 text-center text-sm text-gray-400">Nenhum pedido encontrado.</p>
@@ -419,8 +446,8 @@ export function SearchOrders() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Produto</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Qtd</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Preço unit.</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 max-md:hidden">Qtd</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 max-md:hidden">Preço unit.</th>
                     <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Subtotal</th>
                   </tr>
                 </thead>
@@ -434,9 +461,12 @@ export function SearchOrders() {
                         {item.product_number != null && (
                           <span className="ml-1 text-xs text-gray-400">#{item.product_number}</span>
                         )}
+                        <span className="block text-xs text-gray-500 md:hidden">
+                          {item.quantity} × {formatCurrency(item.unit_price)}
+                        </span>
                       </td>
-                      <td className="px-3 py-2">{item.quantity}</td>
-                      <td className="px-3 py-2">{formatCurrency(item.unit_price)}</td>
+                      <td className="px-3 py-2 max-md:hidden">{item.quantity}</td>
+                      <td className="px-3 py-2 max-md:hidden">{formatCurrency(item.unit_price)}</td>
                       <td className="px-3 py-2 font-semibold">{formatCurrency(item.subtotal)}</td>
                     </tr>
                   ))}
@@ -456,7 +486,7 @@ export function SearchOrders() {
               </ul>
             </div>
 
-            <div className="flex gap-2 border-t border-gray-100 pt-4">
+            <div className="flex gap-2 border-t border-gray-100 pt-4 max-md:flex-wrap">
               <Button variant="secondary" onClick={() => openEdit(selected)}>✏️ Editar pedido</Button>
               <Button
                 variant="danger"
@@ -564,7 +594,7 @@ export function SearchOrders() {
                           tabIndex={0}
                           onClick={(e) => { e.stopPropagation(); removeItem(idx); }}
                           onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); removeItem(idx); } }}
-                          className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-gray-400 hover:bg-red-100 hover:text-red-500 transition cursor-pointer"
+                          className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-gray-400 hover:bg-red-100 hover:text-red-500 transition cursor-pointer max-md:h-6 max-md:w-6"
                           title="Remover item"
                         >
                           ✕
@@ -608,7 +638,7 @@ export function SearchOrders() {
                       options={getProductOptions(activeEditItem.search)}
                     />
                     {activeEditProduct && (
-                      <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5 text-xs">
+                      <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5 text-xs max-md:flex-wrap">
                         <span className="font-medium text-gray-700">Preço original:</span>
                         <span className="font-bold text-brand-pink-deep">{formatCurrency(activeEditProduct.price)}</span>
                         <span className="mx-1 text-gray-300">·</span>

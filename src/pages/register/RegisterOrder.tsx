@@ -231,7 +231,7 @@ export function RegisterOrder() {
         )}
 
         {/* Card: Dados do Pedido */}
-        <div className="mb-5 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card">
+        <div className="mb-5 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card max-md:p-4">
           <div className="mb-5 flex items-center gap-2 border-b border-brand-pink/10 pb-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-pink/20 text-base">🛒</span>
             <h4 className="font-semibold text-brand-pink-deep">Dados do pedido</h4>
@@ -268,7 +268,7 @@ export function RegisterOrder() {
         </div>
 
         {/* Card: Cliente */}
-        <div className="mb-5 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card">
+        <div className="mb-5 rounded-2xl border border-brand-pink/20 bg-white p-6 shadow-card max-md:p-4">
           <div className="mb-5 flex items-center gap-2 border-b border-brand-pink/10 pb-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-yellow/40 text-base">👤</span>
             <h4 className="font-semibold text-brand-pink-deep">Cliente</h4>
@@ -313,7 +313,7 @@ export function RegisterOrder() {
         {/* Card: Itens do Pedido — com abas */}
         <div className="mb-5 rounded-2xl border border-brand-pink/20 bg-white shadow-card">
           {/* Cabeçalho */}
-          <div className="flex items-center gap-2 border-b border-brand-pink/10 px-6 pt-6 pb-3">
+          <div className="flex items-center gap-2 border-b border-brand-pink/10 px-6 pt-6 pb-3 max-md:px-4 max-md:pt-4">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-base">📋</span>
             <h4 className="font-semibold text-brand-pink-deep">Itens do pedido</h4>
             <span className="ml-auto text-xs text-gray-400">{items.length} item{items.length !== 1 ? "s" : ""}</span>
@@ -354,7 +354,7 @@ export function RegisterOrder() {
                       tabIndex={0}
                       onClick={(e) => { e.stopPropagation(); removeItem(idx); }}
                       onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); removeItem(idx); } }}
-                      className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-gray-400 hover:bg-red-100 hover:text-red-500 transition cursor-pointer"
+                      className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-gray-400 hover:bg-red-100 hover:text-red-500 transition cursor-pointer max-md:h-6 max-md:w-6"
                       title="Remover item"
                     >
                       ✕
@@ -377,7 +377,7 @@ export function RegisterOrder() {
 
           {/* Conteúdo da aba ativa */}
           {activeItem && (
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 max-md:p-4">
 
               {/* Busca exclusiva do item */}
               <Input
@@ -399,7 +399,7 @@ export function RegisterOrder() {
                   options={getProductOptions(activeItem.search)}
                 />
                 {activeProduct && (
-                  <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5 text-xs">
+                  <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5 text-xs max-md:flex-wrap">
                     <span className="font-medium text-gray-700">Preço original:</span>
                     <span className="font-bold text-brand-pink-deep">{formatCurrency(activeProduct.price)}</span>
                     <span className="mx-1 text-gray-300">·</span>

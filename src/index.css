@@ -6,6 +6,30 @@
   body {
     @apply bg-brand-cream font-sans text-gray-800 antialiased;
   }
+
+  /* No iPhone, campos com menos de 16px fazem o navegador dar zoom ao tocar */
+  @media (max-width: 767.98px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+
+    input[type="date"] {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    /* Campos largos não podem alargar as colunas do grid além da tela */
+    .grid > * {
+      min-width: 0;
+    }
+
+    /* O balão oculto do gráfico fica fora da área e causaria rolagem lateral */
+    .recharts-responsive-container {
+      overflow: hidden;
+    }
+  }
 }
 
 @layer components {
@@ -14,6 +38,24 @@
   }
 
   .section-card {
-    @apply rounded-2xl border border-brand-pink/40 bg-white p-6 shadow-card;
+    @apply rounded-2xl border border-brand-pink/40 bg-white p-6 shadow-card max-md:p-4;
+  }
+
+  @media (max-width: 767.98px) {
+    div.filter-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: end;
+    }
+
+    .filter-grid input,
+    .filter-grid select {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .filter-grid-lead > :first-child {
+      grid-column: 1 / -1;
+    }
   }
 }
