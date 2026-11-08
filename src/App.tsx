@@ -1,5 +1,9 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/layout/Layout";
+import { useAuthToken } from "./lib/auth";
+import { LoginPage } from "./pages/LoginPage";
 import { ChartsPage } from "./pages/ChartsPage";
 import { Dashboard } from "./pages/Dashboard";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -14,6 +18,16 @@ import { SearchOrders } from "./pages/search/SearchOrders";
 import { SearchProducts } from "./pages/search/SearchProducts";
 
 export function App() {
+  const token = useAuthToken();
+  const queryClient = useQueryClient();
+
+  // Ao sair, nenhum dado do usuário fica na memória da página
+  useEffect(() => {
+    if (!token) queryClient.clear();
+  }, [token, queryClient]);
+
+  if (!token) return <LoginPage />;
+
   return (
     <BrowserRouter>
       <Routes>

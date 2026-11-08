@@ -17,6 +17,7 @@ import type {
   TopCustomer,
   TopProduct,
 } from "../types";
+import { clearToken, getToken } from "./auth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 console.log("API_URL:", API_URL);
@@ -36,13 +37,19 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const token = getToken();
   const response = await fetch(`${API_URL}${path}`, {
+    ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
-    ...options,
   });
+
+  if (response.status === 401 && token) {
+    clearToken();
+  }
 
   if (!response.ok) {
     let detail = "Erro na requisição";
@@ -77,6 +84,13 @@ function buildQuery(params: Record<string, string | number | undefined | null>) 
 }
 
 export const api = {
+  auth: {
+    login: (username: string, password: string) =>
+      request<{ access_token: string }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      }),
+  },
   customers: {
     list: (params?: {
       search?: string;

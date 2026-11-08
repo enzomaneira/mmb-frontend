@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
+import { clearToken } from "../../lib/auth";
 
 const links = [
   { to: "/", label: "Início" },
@@ -55,7 +56,7 @@ export function Navbar() {
               end={link.to === "/"}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
-                `rounded-xl px-3 py-2 text-sm font-medium transition max-md:py-3 max-md:text-center max-md:text-base ${
+                `rounded-xl px-3 py-2 text-sm font-medium transition md:max-lg:px-2 max-md:py-3 max-md:text-center max-md:text-base ${
                   isActive
                     ? "bg-brand-pink text-white shadow"
                     : "text-gray-600 hover:bg-brand-yellow/60 hover:text-gray-900"
@@ -65,6 +66,13 @@ export function Navbar() {
               {link.label}
             </NavLink>
           ))}
+          <button
+            type="button"
+            onClick={clearToken}
+            className="rounded-xl px-3 py-2 text-sm font-medium text-gray-500 transition hover:bg-red-50 hover:text-red-600 md:max-lg:px-2 max-md:col-span-2 max-md:py-3 max-md:text-base"
+          >
+            Sair
+          </button>
         </nav>
       </div>
     </header>
